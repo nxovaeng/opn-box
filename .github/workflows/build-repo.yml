@@ -1,0 +1,230 @@
+name: Build OPNsense 26.x Package Repository
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_singbox:
+        description: 'Build sing-box (from Vincent-Loeng/bsd-box)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout opn-box Source
+        uses: actions/checkout@v4
+
+      - name: Setup Go Compiler
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Setup Node.js (for WebUI embedding)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Step 1: 100% 源码自编译 (绝不使用第三方预编译二进制)
+      - name: Build All FreeBSD Binaries from Source
+        env:
+          BUILD_SINGBOX: ${{ github.event.inputs.build_singbox || '1' }}
+        run: |
+          mkdir -p dist/bin dist/etc dist/rc.d
+          chmod +x scripts/build_binaries.sh
+          ./scripts/build_binaries.sh dist/bin
+
+          cp rc.d/pf_aliasd dist/rc.d/
+          cp config.example.yaml dist/etc/mosdns.yaml.example
+
+      # Step 2: Native FreeBSD Packaging and Repository Generation
+      - name: Package & Create Repo in FreeBSD 14 VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.2"
+          usesh: true
+          prepare: |
+            pkg install -y pkg
+          run: |
+            ABI=$(pkg config abi)
+            echo "Current FreeBSD Target ABI: $ABI"
+
+            mkdir -p /tmp/stage/usr/local/sbin /tmp/stage/usr/local/bin /tmp/stage/usr/local/etc/rc.d /tmp/stage/usr/local/etc/mosdns
+            mkdir -p repo_output/$ABI repo_output/All
+
+            # Copy self-compiled binaries into staging tree
+            cp dist/bin/pf-aliasd /tmp/stage/usr/local/sbin/
+            cp dist/rc.d/pf_aliasd /tmp/stage/usr/local/etc/rc.d/
+            [ -f dist/bin/mosdns ] && cp dist/bin/mosdns /tmp/stage/usr/local/bin/
+            [ -f dist/bin/mosdns-x ] && cp dist/bin/mosdns-x /tmp/stage/usr/local/bin/
+            [ -f dist/bin/mosdns-controller ] && cp dist/bin/mosdns-controller /tmp/stage/usr/local/bin/
+            [ -f dist/bin/sing-box ] && cp dist/bin/sing-box /tmp/stage/usr/local/bin/
+            cp dist/etc/mosdns.yaml.example /tmp/stage/usr/local/etc/mosdns/config.yaml.sample
+
+            chmod +x /tmp/stage/usr/local/sbin/* /tmp/stage/usr/local/bin/* /tmp/stage/usr/local/etc/rc.d/*
+
+            # 1. Package: pf-aliasd
+            cat << 'EOF' > /tmp/manifest_pf_aliasd
+            name: pf-aliasd
+            version: "1.0.0"
+            origin: net/pf-aliasd
+            comment: "Packet Filter Alias Daemon for OPNsense External Aliases"
+            desc: "Zero-race PF table sync daemon with min-heap TTL garbage collection"
+            maintainer: "admin@opn-box.local"
+            prefix: /usr/local
+            categories: [net]
+            files: {
+              /usr/local/sbin/pf-aliasd: "",
+              /usr/local/etc/rc.d/pf_aliasd: ""
+            }
+            EOF
+            pkg create -m /tmp -f /tmp/manifest_pf_aliasd -r /tmp/stage -o repo_output/All
+
+            # 2. Package: mosdns (v5.3.4 managed，与 mosdns-controller 搭配)
+            if [ -f /tmp/stage/usr/local/bin/mosdns ]; then
+              cat << 'EOF' > /tmp/manifest_mosdns_managed
+              name: mosdns
+              version: "5.3.4"
+              origin: dns/mosdns
+              comment: "MosDNS v5.3.4 with managed-dns API and pf_alias plugin"
+              desc: "MosDNS DNS forwarder supporting web controller and pf-aliasd"
+              maintainer: "admin@opn-box.local"
+              prefix: /usr/local
+              categories: [dns]
+              deps: {
+                pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
+              }
+              files: {
+                /usr/local/bin/mosdns: "",
+                /usr/local/etc/mosdns/config.yaml.sample: ""
+              }
+              EOF
+              pkg create -m /tmp -f /tmp/manifest_mosdns_managed -r /tmp/stage -o repo_output/All
+            fi
+
+            # 3. Package: mosdns-x
+            if [ -f /tmp/stage/usr/local/bin/mosdns-x ]; then
+              cat << 'EOF' > /tmp/manifest_mosdns_x
+              name: mosdns-x
+              version: "26.1.0"
+              origin: dns/mosdns-x
+              comment: "High-performance modular DNS forwarder with DoQ, DoH3 and pf_alias"
+              desc: "MosDNS-X engine compiled from source with pf_alias plugin for OPNsense"
+              maintainer: "admin@opn-box.local"
+              prefix: /usr/local
+              categories: [dns]
+              deps: {
+                pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
+              }
+              files: {
+                /usr/local/bin/mosdns-x: "",
+                /usr/local/etc/mosdns/config.yaml.sample: ""
+              }
+              EOF
+              pkg create -m /tmp -f /tmp/manifest_mosdns_x -r /tmp/stage -o repo_output/All
+            fi
+
+            # 3. Package: mosdns-controller
+            if [ -f /tmp/stage/usr/local/bin/mosdns-controller ]; then
+              cat << 'EOF' > /tmp/manifest_controller
+              name: mosdns-controller
+              version: "1.0.0"
+              origin: dns/mosdns-controller
+              comment: "Web UI and Dynamic Rule Management Controller for MosDNS"
+              desc: "mosdns-controller compiled from luoye663/mosdns-controller source for OPNsense"
+              maintainer: "admin@opn-box.local"
+              prefix: /usr/local
+              categories: [dns]
+              files: {
+                /usr/local/bin/mosdns-controller: ""
+              }
+              EOF
+              pkg create -m /tmp -f /tmp/manifest_controller -r /tmp/stage -o repo_output/All
+            fi
+
+            # 4. Package: sing-box (from Vincent-Loeng/bsd-box)
+            if [ -f /tmp/stage/usr/local/bin/sing-box ]; then
+              cat << 'EOF' > /tmp/manifest_singbox
+              name: sing-box
+              version: "1.13.14"
+              origin: net/sing-box
+              comment: "Universal proxy platform with FreeBSD TUN patches"
+              desc: "sing-box compiled from Vincent-Loeng/bsd-box source for FreeBSD/OPNsense"
+              maintainer: "admin@opn-box.local"
+              prefix: /usr/local
+              categories: [net]
+              files: {
+                /usr/local/bin/sing-box: ""
+              }
+              EOF
+              pkg create -m /tmp -f /tmp/manifest_singbox -r /tmp/stage -o repo_output/All
+            fi
+
+            # 5. Package: os-mosdns (OPNsense UI & Service Plugin)
+            mkdir -p /tmp/stage-ui/usr/local
+            cp -r src/os-mosdns/src/* /tmp/stage-ui/usr/local/
+            cat << 'EOF' > /tmp/manifest_os_mosdns
+            name: os-mosdns
+            version: "1.0.0"
+            origin: opnsense/os-mosdns
+            comment: "MosDNS-X Dynamic Routing Engine with pf-aliasd & Controller UI"
+            desc: "OPNsense WebGUI plugin for MosDNS-X with pf-aliasd"
+            maintainer: "admin@opn-box.local"
+            prefix: /usr/local
+            categories: [opnsense]
+            deps: {
+              pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" },
+              mosdns-x: { version: "26.1.0", origin: "dns/mosdns-x" }
+            }
+            files: {
+              /usr/local/opnsense/service/conf/actions.d/actions_mosdns.conf: "",
+              /usr/local/opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml: ""
+            }
+            EOF
+            pkg create -m /tmp -f /tmp/manifest_os_mosdns -r /tmp/stage-ui -o repo_output/All
+
+            # Generate FreeBSD repository catalog
+            pkg repo repo_output/All
+
+            # Opnwall-style compatibility: support both root URL and ${ABI} subpaths
+            cp repo_output/All/* repo_output/$ABI/
+            cp repo_output/All/* repo_output/
+
+            # Generate opnbox.conf client repository configuration
+            cat << EOF > repo_output/opnbox.conf
+            opnbox: {
+              url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/",
+              mirror_type: "http",
+              signature_type: "none",
+              priority: 10,
+              enabled: yes
+            }
+            EOF
+
+            # Copy to final publish directory
+            mkdir -p $GITHUB_WORKSPACE/public
+            cp -r repo_output/* $GITHUB_WORKSPACE/public/
+
+      # Step 3: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages Branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          force_orphan: true

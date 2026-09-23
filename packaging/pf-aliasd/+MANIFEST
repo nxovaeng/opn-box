@@ -1,0 +1,20 @@
+# +MANIFEST template for pf-aliasd
+name: pf-aliasd
+version: "1.0.0"
+origin: net/pf-aliasd
+comment: "Packet Filter Alias Daemon for OPNsense"
+desc: |
+  pf-aliasd is a high-performance resident daemon that keeps /dev/pf open
+  and receives IP updates with TTL over Unix SOCK_SEQPACKET sockets.
+  It performs batch ioctl operations on OPNsense External Aliases and
+  implements automatic TTL-based garbage collection via a min-heap scheduler.
+maintainer: "admin@opn-box.local"
+www: "https://github.com/opn-box/opn-box"
+prefix: /usr/local
+categories: [net]
+licenselogic: single
+licenses: [MIT]
+files: {
+  /usr/local/sbin/pf-aliasd: "",
+  /usr/local/etc/rc.d/pf_aliasd: ""
+}

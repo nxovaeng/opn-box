@@ -1,0 +1,78 @@
+# MosDNS v5 Configuration Example with pf_alias Plugin
+log:
+  level: info
+  file: ""
+
+plugins:
+  # -------------------------------------------------------------
+  # 1. Upstream Forwarders
+  # -------------------------------------------------------------
+  - tag: forward_remote
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "https://1.1.1.1/dns-query"
+        - addr: "https://8.8.8.8/dns-query"
+
+  - tag: forward_local
+    type: forward
+    args:
+      upstreams:
+        - addr: "223.5.5.5"
+        - addr: "119.29.29.29"
+
+  # -------------------------------------------------------------
+  # 2. Domain Data Providers
+  # -------------------------------------------------------------
+  - tag: gfw_list
+    type: domain_set
+    args:
+      files:
+        - "/usr/local/etc/mosdns/rule/gfw.txt"
+
+  # -------------------------------------------------------------
+  # 3. pf_alias Plugin (OPNsense External Alias Integration)
+  # -------------------------------------------------------------
+  - tag: sync_to_pf
+    type: pf_alias
+    args:
+      socket_path: "/var/run/pf-aliasd.sock"
+      table: "GFW_Proxy"          # OPNsense External Alias Name (table <GFW_Proxy> persist)
+      min_ttl: 60                 # Minimum clamp TTL in seconds
+      max_ttl: 86400              # Maximum clamp TTL (24h)
+      timeout: "100ms"            # Synchronous wait timeout (failsafe)
+      sync: true                  # Synchronous injection to avoid first-packet race condition
+
+  # -------------------------------------------------------------
+  # 4. Main Sequence Pipeline
+  # -------------------------------------------------------------
+  - tag: main_sequence
+    type: sequence
+    args:
+      exec:
+        # Match Proxy / GFW domains
+        - if:
+            - query_is_gfw_domain
+          exec:
+            - forward_remote      # Resolve via remote DoH
+            - sync_to_pf          # Extract IPs + TTL, synchronously push to pf-aliasd
+            - _return
+
+        # Default fallback to domestic DNS
+        - forward_local
+
+  - tag: query_is_gfw_domain
+    type: sequence
+    args:
+      exec:
+        - _matches_domain: gfw_list
+
+  # -------------------------------------------------------------
+  # 5. DNS Server Listeners
+  # -------------------------------------------------------------
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: "127.0.0.1:5353"

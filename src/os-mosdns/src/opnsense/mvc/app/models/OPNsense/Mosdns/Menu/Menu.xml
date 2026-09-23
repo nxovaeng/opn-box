@@ -1,0 +1,9 @@
+<menu>
+    <Services>
+        <MosDNS VisibleName="MosDNS" cssClass="fa fa-sitemap fa-fw">
+            <General VisibleName="Settings" url="/ui/mosdns/general" Order="10"/>
+            <Dashboard VisibleName="Controller Web UI" url="http://{SERVER_ADDR}:5380" target="_blank" Order="20"/>
+            <Log VisibleName="Log File" url="/ui/diagnostics/log/core/mosdns" Order="30"/>
+        </MosDNS>
+    </Services>
+</menu>

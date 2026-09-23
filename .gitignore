@@ -1,0 +1,20 @@
+# Build artifacts & binaries
+dist/
+public/
+repo_output/
+/pf-aliasd
+/pf-aliasd-freebsd
+*.o
+*.a
+*.so
+
+# Temporary & cache files
+tmp/
+*.tmp
+*.log
+.local/
+node_modules/
+
+# OS specific
+.DS_Store
+Thumbs.db

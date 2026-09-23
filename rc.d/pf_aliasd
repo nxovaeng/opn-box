@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# PROVIDE: pf_aliasd
+# REQUIRE: pf
+# BEFORE: mosdns
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="pf_aliasd"
+rcvar="pf_aliasd_enable"
+
+load_rc_config $name
+
+: ${pf_aliasd_enable:="NO"}
+: ${pf_aliasd_socket:="/var/run/pf-aliasd.sock"}
+: ${pf_aliasd_gc_interval:="2s"}
+: ${pf_aliasd_batch:="256"}
+: ${pf_aliasd_mode:="0660"}
+
+command="/usr/local/sbin/pf-aliasd"
+command_args="-socket ${pf_aliasd_socket} -gc ${pf_aliasd_gc_interval} -batch ${pf_aliasd_batch} -mode ${pf_aliasd_mode} > /var/log/pf-aliasd.log 2>&1 &"
+
+run_rc_command "$1"
