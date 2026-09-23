@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 # ==============================================================================
@@ -26,13 +26,14 @@ SINGBOX_VERSION="${SINGBOX_VERSION:-1.13.14}"
 MOSDNS_MANAGED_COMMIT="${MOSDNS_MANAGED_COMMIT:-a740966d7123906cc87522b2732752d60b99c2ae}" # 基于官方 v5.3.4 + managed-dns API (与 UI 严格配套)
 MOSDNS_CONTROLLER_TAG="${MOSDNS_CONTROLLER_TAG:-v0.0.2}"                                     # Web UI 控制器发行版
 MOSDNS_X_TAG="${MOSDNS_X_TAG:-v26.01.18}"                                                   # 具备 DoQ/DoH3 的演进版
+MOSDNS_SHORT_COMMIT=$(printf "%.7s" "${MOSDNS_MANAGED_COMMIT}")
 
 echo "=========================================================="
 echo " 开始 100% 源码自编译流水线 (FreeBSD 64-bit / OPNsense 26.x)"
 echo " 工作目录: ${WORKSPACE_DIR}"
 echo " 目标输出: ${OUTPUT_DIR}"
 echo " 锁定版本: sing-box=v${SINGBOX_VERSION}"
-echo "           mosdns-managed=v5.3.4 (${MOSDNS_MANAGED_COMMIT:0:7})"
+echo "           mosdns-managed=v5.3.4 (${MOSDNS_SHORT_COMMIT})"
 echo "           mosdns-controller=${MOSDNS_CONTROLLER_TAG}"
 echo "           mosdns-x=${MOSDNS_X_TAG}"
 echo "=========================================================="
@@ -50,7 +51,7 @@ echo "    -> pf-aliasd 编译成功"
 # ------------------------------------------------------------------------------
 # 2. 从源码编译 luoye663/mosdns (严格基于 v5.3.4 managed-dns，与 UI 完美配套)
 # ------------------------------------------------------------------------------
-echo "==> [2/5] 编译 mosdns (基于 v5.3.4 managed-dns ${MOSDNS_MANAGED_COMMIT:0:7}，嵌入自研 pf_alias)..."
+echo "==> [2/5] 编译 mosdns (基于 v5.3.4 managed-dns ${MOSDNS_SHORT_COMMIT}，嵌入自研 pf_alias)..."
 git clone https://github.com/luoye663/mosdns.git "${BUILD_TMP}/mosdns-managed"
 (
     cd "${BUILD_TMP}/mosdns-managed"
