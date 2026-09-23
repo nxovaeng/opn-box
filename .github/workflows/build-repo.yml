@@ -9,10 +9,10 @@ on:
         type: boolean
         default: true
       build_mosdns_x:
-        description: 'Build mosdns-x (DoQ/DoH3)'
+        description: 'Build mosdns-x (DoQ/DoH3) [Optional]'
         required: false
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write
@@ -45,7 +45,7 @@ jobs:
       - name: Build All FreeBSD Binaries from Source
         env:
           BUILD_SINGBOX: ${{ github.event.inputs.build_singbox != false && '1' || '0' }}
-          BUILD_MOSDNS_X: ${{ github.event.inputs.build_mosdns_x != false && '1' || '0' }}
+          BUILD_MOSDNS_X: ${{ github.event.inputs.build_mosdns_x == true && '1' || '0' }}
         run: |
           mkdir -p dist/bin dist/etc dist/rc.d
           chmod +x scripts/build_binaries.sh

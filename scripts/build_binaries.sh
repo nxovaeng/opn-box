@@ -25,7 +25,8 @@ export CGO_ENABLED=0
 SINGBOX_VERSION="${SINGBOX_VERSION:-1.13.14}"
 MOSDNS_VERSION="${MOSDNS_VERSION:-v5.3.4}"                                                    # 官方原版 v5.3.4
 MOSDNS_CONTROLLER_TAG="${MOSDNS_CONTROLLER_TAG:-v0.0.2}"                                     # Web UI 控制器发行版
-MOSDNS_X_TAG="${MOSDNS_X_TAG:-v26.01.18}"                                                   # 具备 DoQ/DoH3 的演进版
+MOSDNS_X_TAG="${MOSDNS_X_TAG:-v26.01.18}"                                                   # 演进版 (默认不编译)
+BUILD_MOSDNS_X="${BUILD_MOSDNS_X:-0}"                                                       # 默认跳过，后续稳定后再开启
 
 echo "=========================================================="
 echo " 开始 100% 源码自编译流水线 (FreeBSD 64-bit / OPNsense 26.x)"
@@ -34,7 +35,11 @@ echo " 目标输出: ${OUTPUT_DIR}"
 echo " 锁定版本: sing-box=v${SINGBOX_VERSION}"
 echo "           mosdns=${MOSDNS_VERSION}"
 echo "           mosdns-controller=${MOSDNS_CONTROLLER_TAG}"
-echo "           mosdns-x=${MOSDNS_X_TAG}"
+if [ "${BUILD_MOSDNS_X}" = "1" ]; then
+    echo "           mosdns-x=${MOSDNS_X_TAG}"
+else
+    echo "           mosdns-x=已禁用 (默认不编译)"
+fi
 echo "=========================================================="
 
 # ------------------------------------------------------------------------------
@@ -95,7 +100,7 @@ fi
 # ------------------------------------------------------------------------------
 # 4. 可选：从源码编译 pmkol/mosdns-x (演进版，支持 DoQ/DoH3)
 # ------------------------------------------------------------------------------
-if [ "${BUILD_MOSDNS_X:-1}" = "1" ]; then
+if [ "${BUILD_MOSDNS_X}" = "1" ]; then
     echo "==> [4/5] 编译 mosdns-x (${MOSDNS_X_TAG}，嵌入自研 pf_alias 适配层)..."
     git clone --branch "${MOSDNS_X_TAG}" --depth=1 https://github.com/pmkol/mosdns-x.git "${BUILD_TMP}/mosdns-x"
     mkdir -p "${BUILD_TMP}/mosdns-x/plugin/executable/pf_alias"
@@ -111,6 +116,8 @@ if [ "${BUILD_MOSDNS_X:-1}" = "1" ]; then
         go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/mosdns-x" .
     )
     echo "    -> mosdns-x 编译成功"
+else
+    echo "==> [4/5] 跳过 mosdns-x 编译 (BUILD_MOSDNS_X=0)"
 fi
 
 # ------------------------------------------------------------------------------
