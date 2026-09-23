@@ -21,19 +21,18 @@ export GOOS=freebsd
 export GOARCH=amd64
 export CGO_ENABLED=0
 
-# --- 明确锁定的上游版本号与提交哈希 (严禁浮动分支) ---
+# --- 明确锁定的上游版本号 (严格指定版本号) ---
 SINGBOX_VERSION="${SINGBOX_VERSION:-1.13.14}"
-MOSDNS_MANAGED_COMMIT="${MOSDNS_MANAGED_COMMIT:-a740966d7123906cc87522b2732752d60b99c2ae}" # 基于官方 v5.3.4 + managed-dns API (与 UI 严格配套)
+MOSDNS_VERSION="${MOSDNS_VERSION:-v5.3.4}"                                                    # 官方原版 v5.3.4
 MOSDNS_CONTROLLER_TAG="${MOSDNS_CONTROLLER_TAG:-v0.0.2}"                                     # Web UI 控制器发行版
 MOSDNS_X_TAG="${MOSDNS_X_TAG:-v26.01.18}"                                                   # 具备 DoQ/DoH3 的演进版
-MOSDNS_SHORT_COMMIT=$(printf "%.7s" "${MOSDNS_MANAGED_COMMIT}")
 
 echo "=========================================================="
 echo " 开始 100% 源码自编译流水线 (FreeBSD 64-bit / OPNsense 26.x)"
 echo " 工作目录: ${WORKSPACE_DIR}"
 echo " 目标输出: ${OUTPUT_DIR}"
 echo " 锁定版本: sing-box=v${SINGBOX_VERSION}"
-echo "           mosdns-managed=v5.3.4 (${MOSDNS_SHORT_COMMIT})"
+echo "           mosdns=${MOSDNS_VERSION}"
 echo "           mosdns-controller=${MOSDNS_CONTROLLER_TAG}"
 echo "           mosdns-x=${MOSDNS_X_TAG}"
 echo "=========================================================="
@@ -49,25 +48,21 @@ echo "==> [1/5] 编译本地 pf-aliasd 守护进程..."
 echo "    -> pf-aliasd 编译成功"
 
 # ------------------------------------------------------------------------------
-# 2. 从源码编译 luoye663/mosdns (严格基于 v5.3.4 managed-dns，与 UI 完美配套)
+# 2. 从源码编译官方 mosdns (严格指定 v5.3.4，嵌入自研 pf_alias)
 # ------------------------------------------------------------------------------
-echo "==> [2/5] 编译 mosdns (基于 v5.3.4 managed-dns ${MOSDNS_SHORT_COMMIT}，嵌入自研 pf_alias)..."
-git clone https://github.com/luoye663/mosdns.git "${BUILD_TMP}/mosdns-managed"
+echo "==> [2/5] 编译 mosdns (官方源码 ${MOSDNS_VERSION}，嵌入自研 pf_alias)..."
+git clone --branch "${MOSDNS_VERSION}" --depth=1 https://github.com/IrineSistiana/mosdns.git "${BUILD_TMP}/mosdns"
+mkdir -p "${BUILD_TMP}/mosdns/plugin/executable/pf_alias"
+cp -r "${WORKSPACE_DIR}/pkg/plugin/"* "${BUILD_TMP}/mosdns/plugin/executable/pf_alias/"
 (
-    cd "${BUILD_TMP}/mosdns-managed"
-    git checkout "${MOSDNS_MANAGED_COMMIT}"
-)
-mkdir -p "${BUILD_TMP}/mosdns-managed/plugin/executable/pf_alias"
-cp -r "${WORKSPACE_DIR}/pkg/plugin/"* "${BUILD_TMP}/mosdns-managed/plugin/executable/pf_alias/"
-(
-    cd "${BUILD_TMP}/mosdns-managed"
+    cd "${BUILD_TMP}/mosdns"
     go mod edit -require "opn-box@v0.0.0"
     go mod edit -replace "opn-box=${WORKSPACE_DIR}"
     sed -i 's|import (|import (\n\t_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/pf_alias"|' main.go
     go mod tidy
-    go build -trimpath -ldflags="-s -w -X 'main.mosdnsBase=v5.3.4'" -o "${OUTPUT_DIR}/mosdns" .
+    go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/mosdns" .
 )
-echo "    -> mosdns (v5.3.4 managed) 编译成功"
+echo "    -> mosdns (${MOSDNS_VERSION}) 编译成功"
 
 # ------------------------------------------------------------------------------
 # 3. 从源码编译 luoye663/mosdns-controller (Web UI 面板，内嵌生产打包 Web 静态资源)
