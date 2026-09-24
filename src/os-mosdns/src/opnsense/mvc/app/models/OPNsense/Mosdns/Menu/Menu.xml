@@ -4,6 +4,7 @@
             <General VisibleName="MosDNS Settings" url="/ui/mosdns/general" Order="10"/>
             <Dashboard VisibleName="MosDNS Controller" url="http://{SERVER_ADDR}:5380" target="_blank" Order="20"/>
             <Tun2Socks VisibleName="Tun2Socks Manager" url="http://{SERVER_ADDR}:5382" target="_blank" Order="30"/>
+            <Xray VisibleName="Xray Manager" url="http://{SERVER_ADDR}:5384" target="_blank" Order="35"/>
             <Log VisibleName="MosDNS Log" url="/ui/diagnostics/log/core/mosdns" Order="40"/>
         </OPNBox>
     </Services>

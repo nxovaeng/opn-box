@@ -190,7 +190,7 @@ pkg install -y os-mosdns sing-box hev-socks5-tunnel xray-core</code></pre>
             <td><strong>xray-core</strong></td>
             <td><code>amd64</code></td>
             <td><code>v26.7.11</code> (官方锁定稳定版)</td>
-            <td>官方稳定版 Xray 代理内核，原生支持 VLESS、xhttp (SplitHTTP) 与 SNI 嗅探二次分流</td>
+            <td>官方稳定版 Xray 代理内核，原生支持 VLESS、xhttp (SplitHTTP) 与 SNI 嗅探，内嵌 xray-controller Web 管理面板 (端口 :5384) 支持订阅导入、可视化 7 层路由分流与局域网自定义入站</td>
           </tr>
         </tbody>
       </table>

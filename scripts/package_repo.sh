@@ -152,6 +152,7 @@ fi
 [ -f "${DIST_DIR}/bin/hev-socks5-tunnel" ] && cp "${DIST_DIR}/bin/hev-socks5-tunnel" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/hev-controller" ] && cp "${DIST_DIR}/bin/hev-controller" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/xray" ] && cp "${DIST_DIR}/bin/xray" "${STAGE_DIR}/usr/local/bin/"
+[ -f "${DIST_DIR}/bin/xray-controller" ] && cp "${DIST_DIR}/bin/xray-controller" "${STAGE_DIR}/usr/local/bin/"
 
 if [ -d "${DIST_DIR}/share/xray" ]; then
   cp -r "${DIST_DIR}/share/xray/"* "${STAGE_DIR}/usr/local/share/xray/" 2>/dev/null || true
@@ -173,6 +174,12 @@ if [ -f "${WORKSPACE_DIR}/rc.d/xray" ]; then
   cp "${WORKSPACE_DIR}/rc.d/xray" "${STAGE_DIR}/usr/local/etc/rc.d/"
 elif [ -f "${DIST_DIR}/rc.d/xray" ]; then
   cp "${DIST_DIR}/rc.d/xray" "${STAGE_DIR}/usr/local/etc/rc.d/"
+fi
+
+if [ -f "${WORKSPACE_DIR}/rc.d/xray_controller" ]; then
+  cp "${WORKSPACE_DIR}/rc.d/xray_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
+elif [ -f "${DIST_DIR}/rc.d/xray_controller" ]; then
+  cp "${DIST_DIR}/rc.d/xray_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
 fi
 
 if [ -f "${WORKSPACE_DIR}/config.example.yaml" ]; then
@@ -348,16 +355,16 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.7 Package: xray-core (官方稳定版代理内核，原生支持 xhttp、VLESS 与 SNI 嗅探)
+# 3.7 Package: xray-core (官方稳定版代理内核，原生支持 xhttp、VLESS 与 SNI 嗅探，内嵌 Web 管理器)
 # ------------------------------------------------------------------------------
-if [ -f "${STAGE_DIR}/usr/local/bin/xray" ]; then
-  echo "==> 打包 xray-core (官方稳定版, v${XRAY_VERSION})..."
+if [ -f "${STAGE_DIR}/usr/local/bin/xray" ] || [ -f "${STAGE_DIR}/usr/local/bin/xray-controller" ]; then
+  echo "==> 打包 xray-core (官方稳定版 + Xray Manager, v${XRAY_VERSION})..."
   cat << EOF > /tmp/manifest_xray
 name: xray-core
 version: "${XRAY_VERSION}"
 origin: security/xray-core
-comment: "Xray-core proxy engine with VLESS, xhttp and sniffing support"
-desc: "Official Xray-core pre-compiled release packaged for OPNsense"
+comment: "Xray-core proxy engine with Web UI manager, VLESS, xhttp and sniffing support"
+desc: "Official Xray-core release packaged with xray-controller WebUI for OPNsense"
 maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
@@ -366,9 +373,11 @@ arch: "FreeBSD:*:amd64"
 EOF
   rm -f /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/bin/xray" ] && echo "bin/xray" >> /tmp/plist_xray
+  [ -f "${STAGE_DIR}/usr/local/bin/xray-controller" ] && echo "bin/xray-controller" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/share/xray/geoip.dat" ] && echo "share/xray/geoip.dat" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/share/xray/geosite.dat" ] && echo "share/xray/geosite.dat" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/etc/rc.d/xray" ] && echo "etc/rc.d/xray" >> /tmp/plist_xray
+  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/xray_controller" ] && echo "etc/rc.d/xray_controller" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/etc/xray/config.json.sample" ] && echo "etc/xray/config.json.sample" >> /tmp/plist_xray
 
   pkg create -M /tmp/manifest_xray -p /tmp/plist_xray -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"

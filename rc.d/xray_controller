@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# PROVIDE: xray_controller
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="xray_controller"
+rcvar="xray_controller_enable"
+
+load_rc_config $name
+
+: ${xray_controller_enable:="NO"}
+: ${xray_controller_listen:=":5384"}
+: ${xray_controller_config:="/usr/local/etc/xray/config.json"}
+: ${xray_controller_data:="/usr/local/etc/xray/controller_data.json"}
+: ${xray_controller_logfile:="/var/log/xray-controller.log"}
+: ${xray_controller_pidfile:="/var/run/xray-controller.pid"}
+
+pidfile="${xray_controller_pidfile}"
+command="/usr/sbin/daemon"
+procname="/usr/local/bin/xray-controller"
+command_args="-p ${pidfile} -o ${xray_controller_logfile} -t ${name} ${procname} -listen ${xray_controller_listen} -config ${xray_controller_config} -data ${xray_controller_data}"
+
+start_precmd="xray_controller_prestart"
+
+xray_controller_prestart()
+{
+    mkdir -p /var/log /var/run /usr/local/etc/xray
+    touch "${xray_controller_logfile}"
+}
+
+run_rc_command "$1"
