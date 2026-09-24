@@ -118,11 +118,11 @@ jobs:
               deps: {
                 pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
               }
-              EOF
+            EOF
               cat << 'EOF' > /tmp/plist_mosdns
               bin/mosdns
               etc/mosdns/config.yaml.sample
-              EOF
+            EOF
               pkg create -M /tmp/manifest_mosdns -p /tmp/plist_mosdns -r /tmp/stage -o repo_output/All
             fi
 
@@ -142,11 +142,11 @@ jobs:
               deps: {
                 pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
               }
-              EOF
+            EOF
               cat << 'EOF' > /tmp/plist_mosdns_x
               bin/mosdns-x
               etc/mosdns/config.yaml.sample
-              EOF
+            EOF
               pkg create -M /tmp/manifest_mosdns_x -p /tmp/plist_mosdns_x -r /tmp/stage -o repo_output/All
             fi
 
@@ -163,10 +163,10 @@ jobs:
               prefix: /usr/local
               categories: [dns]
               arch: "FreeBSD:*:amd64"
-              EOF
+            EOF
               cat << 'EOF' > /tmp/plist_controller
               bin/mosdns-controller
-              EOF
+            EOF
               pkg create -M /tmp/manifest_controller -p /tmp/plist_controller -r /tmp/stage -o repo_output/All
             fi
 
@@ -183,10 +183,10 @@ jobs:
               prefix: /usr/local
               categories: [net]
               arch: "FreeBSD:*:amd64"
-              EOF
+            EOF
               cat << 'EOF' > /tmp/plist_singbox
               bin/sing-box
-              EOF
+            EOF
               pkg create -M /tmp/manifest_singbox -p /tmp/plist_singbox -r /tmp/stage -o repo_output/All
             fi
 
