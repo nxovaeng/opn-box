@@ -12,6 +12,7 @@ maintainer: "admin@opn-box.local"
 www: "https://github.com/opn-box/opn-box"
 prefix: /usr/local
 categories: [net]
+arch: "FreeBSD:*:amd64"
 licenselogic: single
 licenses: [MIT]
 files: {

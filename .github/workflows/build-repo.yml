@@ -23,6 +23,9 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  CUSTOM_DOMAIN: opnbox.zro.qzz.io
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -88,8 +91,10 @@ jobs:
             comment: "Packet Filter Alias Daemon for OPNsense External Aliases"
             desc: "Zero-race PF table sync daemon with min-heap TTL garbage collection"
             maintainer: "admin@opn-box.local"
+            www: "https://github.com/${{ github.repository }}"
             prefix: /usr/local
             categories: [net]
+            arch: "FreeBSD:*:amd64"
             EOF
             cat << 'EOF' > /tmp/plist_pf_aliasd
             sbin/pf-aliasd
@@ -106,8 +111,10 @@ jobs:
               comment: "Official MosDNS v5.3.4 with pf_alias plugin"
               desc: "Official MosDNS v5.3.4 compiled from source with pf_alias for OPNsense"
               maintainer: "admin@opn-box.local"
+              www: "https://github.com/${{ github.repository }}"
               prefix: /usr/local
               categories: [dns]
+              arch: "FreeBSD:*:amd64"
               deps: {
                 pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
               }
@@ -128,8 +135,10 @@ jobs:
               comment: "High-performance modular DNS forwarder with DoQ, DoH3 and pf_alias"
               desc: "MosDNS-X engine compiled from source with pf_alias plugin for OPNsense"
               maintainer: "admin@opn-box.local"
+              www: "https://github.com/${{ github.repository }}"
               prefix: /usr/local
               categories: [dns]
+              arch: "FreeBSD:*:amd64"
               deps: {
                 pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
               }
@@ -150,8 +159,10 @@ jobs:
               comment: "Web UI and Dynamic Rule Management Controller for MosDNS"
               desc: "mosdns-controller compiled from luoye663/mosdns-controller source for OPNsense"
               maintainer: "admin@opn-box.local"
+              www: "https://github.com/${{ github.repository }}"
               prefix: /usr/local
               categories: [dns]
+              arch: "FreeBSD:*:amd64"
               EOF
               cat << 'EOF' > /tmp/plist_controller
               bin/mosdns-controller
@@ -168,8 +179,10 @@ jobs:
               comment: "Universal proxy platform with FreeBSD TUN patches"
               desc: "sing-box compiled with local FreeBSD patches for FreeBSD/OPNsense"
               maintainer: "admin@opn-box.local"
+              www: "https://github.com/${{ github.repository }}"
               prefix: /usr/local
               categories: [net]
+              arch: "FreeBSD:*:amd64"
               EOF
               cat << 'EOF' > /tmp/plist_singbox
               bin/sing-box
@@ -187,8 +200,10 @@ jobs:
             comment: "MosDNS Dynamic Routing Engine with pf-aliasd & Controller UI"
             desc: "OPNsense WebGUI plugin for MosDNS with pf-aliasd"
             maintainer: "admin@opn-box.local"
+            www: "https://github.com/${{ github.repository }}"
             prefix: /usr/local
             categories: [opnsense]
+            arch: "*"
             deps: {
               pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" },
               mosdns: { version: "5.3.4", origin: "dns/mosdns" }
@@ -203,14 +218,17 @@ jobs:
             # Generate FreeBSD repository catalog
             pkg repo repo_output/All
 
-            # Opnwall-style compatibility: support both root URL and ${ABI} subpaths
+            # Compatibility: support root URL, ${ABI}, FreeBSD:14:amd64 and FreeBSD:15:amd64
+            mkdir -p repo_output/FreeBSD:14:amd64 repo_output/FreeBSD:15:amd64
             cp repo_output/All/* repo_output/$ABI/
+            cp repo_output/All/* repo_output/FreeBSD:14:amd64/
+            cp repo_output/All/* repo_output/FreeBSD:15:amd64/
             cp repo_output/All/* repo_output/
 
             # Generate opnbox.conf client repository configuration
-            cat << EOF > repo_output/opnbox.conf
+            cat << 'EOF' > repo_output/opnbox.conf
             opnbox: {
-              url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/",
+              url: "https://${{ env.CUSTOM_DOMAIN }}/${ABI}",
               mirror_type: "http",
               signature_type: "none",
               priority: 10,
@@ -222,10 +240,18 @@ jobs:
             mkdir -p $GITHUB_WORKSPACE/public
             cp -r repo_output/* $GITHUB_WORKSPACE/public/
 
-      # Step 3: Deploy to GitHub Pages
+      # Step 3: Generate Repository Portal Landing Page (.nojekyll, CNAME & index.html)
+      - name: Generate Repository Portal Page
+        run: |
+          chmod +x scripts/generate_index.sh
+          ./scripts/generate_index.sh public "${{ github.repository_owner }}" "${{ github.event.repository.name }}" "${{ env.CUSTOM_DOMAIN }}"
+
+      # Step 4: Deploy to GitHub Pages
       - name: Deploy to GitHub Pages Branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
+          cname: ${{ env.CUSTOM_DOMAIN }}
           force_orphan: true
+
