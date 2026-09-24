@@ -114,10 +114,10 @@ cat << EOF > "${INDEX_FILE}"
     <header>
       <h1>📦 opn-box 专属软件源</h1>
       <p style="color: var(--text-muted); margin: 0.5rem 0 0 0;">
-        适用于 <strong>OPNsense 25.x / 26.x (FreeBSD 14 & FreeBSD 15 amd64)</strong> 的高性能策略路由与 DNS 分流套件
+        适用于 <strong>OPNsense 26.x (FreeBSD:15:amd64)</strong> 的高性能策略路由与 DNS 分流套件
       </p>
       <div class="badges">
-        <span class="badge">FreeBSD 14 & 15 通用</span>
+        <span class="badge">FreeBSD 15 专版</span>
         <span class="badge">100% 源码自编译</span>
         <span class="badge">零首包竞态</span>
         <span class="badge">Min-Heap TTL GC</span>
@@ -152,43 +152,43 @@ pkg install -y os-mosdns sing-box hev-socks5-tunnel xray-core</code></pre>
         <tbody>
           <tr>
             <td><strong>os-mosdns</strong></td>
-            <td><code>all</code></td>
+            <td><code>FreeBSD:15:amd64</code></td>
             <td><code>YYYY.MM.DD</code> (自编构建日期)</td>
             <td>OPNsense WebGUI 插件模型、服务动作、菜单与后台控制</td>
           </tr>
           <tr>
             <td><strong>pf-aliasd</strong></td>
-            <td><code>amd64</code></td>
+            <td><code>FreeBSD:15:amd64</code></td>
             <td><code>YYYY.MM.DD</code> (自编构建日期)</td>
             <td>常驻 /dev/pf ioctl 同步守护进程，内置 Min-Heap TTL 垃圾回收</td>
           </tr>
           <tr>
             <td><strong>mosdns</strong></td>
-            <td><code>amd64</code></td>
+            <td><code>FreeBSD:15:amd64</code></td>
             <td><code>v5.3.4</code> (官方源码+插件)</td>
             <td>官方原版 v5.3.4，内置自研 pf_alias 插件，零首包竞态保障</td>
           </tr>
           <tr>
             <td><strong>mosdns-controller</strong></td>
-            <td><code>amd64</code></td>
+            <td><code>FreeBSD:15:amd64</code></td>
             <td><code>YYYY.MM.DD</code> (自编构建日期)</td>
             <td>WebUI 规则管理面板与动态控制器 (端口 :5380)</td>
           </tr>
           <tr>
             <td><strong>sing-box</strong></td>
-            <td><code>amd64</code></td>
+            <td><code>FreeBSD:15:amd64</code></td>
             <td><code>v1.13.14</code> (官方源码+补丁)</td>
             <td>集成 FreeBSD TUN 本地适配补丁的全功能代理内核</td>
           </tr>
           <tr>
             <td><strong>hev-socks5-tunnel</strong></td>
-            <td><code>amd64</code></td>
+            <td><code>FreeBSD:15:amd64</code></td>
             <td><code>v2.17.1</code> (官方锁定稳定版)</td>
             <td>纯 C 协程极致性能 Tun2Socks 虚拟网卡代理，内嵌 hev-controller Web 管理面板 (端口 :5382)</td>
           </tr>
           <tr>
             <td><strong>xray-core</strong></td>
-            <td><code>amd64</code></td>
+            <td><code>FreeBSD:15:amd64</code></td>
             <td><code>v26.7.11</code> (官方锁定稳定版)</td>
             <td>官方稳定版 Xray 代理内核，原生支持 VLESS、xhttp (SplitHTTP) 与 SNI 嗅探，内嵌 xray-controller Web 管理面板 (端口 :5384) 支持订阅导入、可视化 7 层路由分流与局域网自定义入站</td>
           </tr>

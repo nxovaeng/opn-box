@@ -7,7 +7,7 @@ set -e
 # 特性：
 # 1. 严格使用标准 POSIX /bin/sh 语法，可在 FreeBSD 原生环境及 VM 中无缝执行
 # 2. 自动化将编译产物装载到 stage 目录并构建 FreeBSD 格式 .pkg 安装包
-# 3. 补齐强制元数据（www、arch 通配符），支持 FreeBSD 14 / 15 双 ABI 镜像分发
+# 3. 补齐强制元数据（www、abi/arch 严格指定 FreeBSD:15:amd64），专供 FreeBSD 15 (OPNsense 26.x)
 # 4. 支持参数化配置：自定义输出目录、自定义域名、发布目录等
 # ==============================================================================
 
@@ -77,12 +77,8 @@ else
 fi
 PROJECT_WEB_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}"
 
-# 检测当前系统 ABI
-if command -v pkg >/dev/null 2>&1; then
-  ABI=$(pkg config abi 2>/dev/null || echo "FreeBSD:14:amd64")
-else
-  ABI="FreeBSD:14:amd64"
-fi
+# 严格指定目标系统 ABI 为 FreeBSD 15 (FreeBSD:15:amd64)，杜绝通配符
+ABI="FreeBSD:15:amd64"
 
 echo "=========================================================="
 echo " 开始生成 OPNsense 软件源仓库 (FreeBSD pkg repo)"
@@ -225,7 +221,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [net]
-arch: "FreeBSD:*:amd64"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 EOF
   cat << EOF > /tmp/plist_pf_aliasd
 sbin/pf-aliasd
@@ -249,7 +246,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [dns]
-arch: "FreeBSD:*:amd64"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 deps: {
   pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" }
 }
@@ -276,7 +274,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [dns]
-arch: "FreeBSD:*:amd64"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 deps: {
   pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" }
 }
@@ -303,7 +302,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [dns]
-arch: "FreeBSD:*:amd64"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 EOF
   cat << EOF > /tmp/plist_controller
 bin/mosdns-controller
@@ -326,7 +326,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [net]
-arch: "FreeBSD:*:amd64"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 EOF
   cat << EOF > /tmp/plist_singbox
 bin/sing-box
@@ -349,7 +350,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [net]
-arch: "FreeBSD:*:amd64"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 EOF
   rm -f /tmp/plist_hev
   [ -f "${STAGE_DIR}/usr/local/bin/hev-socks5-tunnel" ] && echo "bin/hev-socks5-tunnel" >> /tmp/plist_hev
@@ -376,7 +378,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [security]
-arch: "FreeBSD:*:amd64"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 EOF
   rm -f /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/bin/xray" ] && echo "bin/xray" >> /tmp/plist_xray
@@ -414,7 +417,8 @@ maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
 categories: [opnsense]
-arch: "*"
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
 deps: {
   pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" },
   mosdns: { version: "5.3.4", origin: "dns/mosdns" }
@@ -429,15 +433,13 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 4. 生成软件源元数据索引 (pkg repo) 与多 ABI 镜像兼容
+# 4. 生成软件源元数据索引 (pkg repo)
 # ------------------------------------------------------------------------------
 echo "==> 生成 FreeBSD pkg 索引目录 (pkg repo)..."
 pkg repo "${OUTPUT_DIR}/All"
 
-echo "==> 同步生成双 ABI 镜像路径 (FreeBSD:14:amd64 & FreeBSD:15:amd64)..."
-mkdir -p "${OUTPUT_DIR}/FreeBSD:14:amd64" "${OUTPUT_DIR}/FreeBSD:15:amd64"
-cp "${OUTPUT_DIR}/All"/* "${OUTPUT_DIR}/${ABI}/"
-cp "${OUTPUT_DIR}/All"/* "${OUTPUT_DIR}/FreeBSD:14:amd64/"
+echo "==> 同步生成 FreeBSD:15:amd64 软件源发布路径..."
+mkdir -p "${OUTPUT_DIR}/FreeBSD:15:amd64"
 cp "${OUTPUT_DIR}/All"/* "${OUTPUT_DIR}/FreeBSD:15:amd64/"
 cp "${OUTPUT_DIR}/All"/* "${OUTPUT_DIR}/"
 

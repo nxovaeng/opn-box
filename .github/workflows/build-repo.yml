@@ -66,10 +66,10 @@ jobs:
           ./scripts/build_binaries.sh dist/bin
 
       # Step 2: Native FreeBSD Packaging and Repository Generation
-      - name: Package & Create Repo in FreeBSD 14 VM
+      - name: Package & Create Repo in FreeBSD 15 VM
         uses: vmactions/freebsd-vm@v1
         with:
-          release: "14.2"
+          release: "15.0"
           usesh: true
           prepare: |
             pkg install -y pkg git gmake
