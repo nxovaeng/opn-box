@@ -27,6 +27,8 @@ MOSDNS_VERSION="${MOSDNS_VERSION:-v5.3.4}"                                      
 MOSDNS_CONTROLLER_TAG="${MOSDNS_CONTROLLER_TAG:-v0.0.2}"                                     # Web UI 控制器发行版
 MOSDNS_X_TAG="${MOSDNS_X_TAG:-v26.01.18}"                                                   # 演进版 (默认不编译)
 BUILD_MOSDNS_X="${BUILD_MOSDNS_X:-0}"                                                       # 默认跳过，后续稳定后再开启
+HEV_TUNNEL_VERSION="${HEV_TUNNEL_VERSION:-2.17.1}"                                            # 官方发布稳定版 (2026.08)
+XRAY_VERSION="${XRAY_VERSION:-26.7.11}"                                                       # 官方发布稳定版 (2026.07)
 
 echo "=========================================================="
 echo " 开始 100% 源码自编译流水线 (FreeBSD 64-bit / OPNsense 26.x)"
@@ -35,6 +37,8 @@ echo " 目标输出: ${OUTPUT_DIR}"
 echo " 锁定版本: sing-box=v${SINGBOX_VERSION}"
 echo "           mosdns=${MOSDNS_VERSION}"
 echo "           mosdns-controller=${MOSDNS_CONTROLLER_TAG}"
+echo "           hev-socks5-tunnel=v${HEV_TUNNEL_VERSION}"
+echo "           xray-core=v${XRAY_VERSION#v}"
 if [ "${BUILD_MOSDNS_X}" = "1" ]; then
     echo "           mosdns-x=${MOSDNS_X_TAG}"
 else
@@ -167,20 +171,28 @@ if [ "${BUILD_SINGBOX:-1}" = "1" ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 5. 拉取外部依赖的官方已发布稳定版 (FreeBSD 64位 二进制)
+# 5. 拉取外部依赖的官方已发布稳定版 (FreeBSD 64位 二进制，严格锁定版本)
 # ------------------------------------------------------------------------------
-echo "==> [5/6] 检查/下载 hev-socks5-tunnel 官方已发布稳定版..."
-if curl -fsSL -o "${OUTPUT_DIR}/hev-socks5-tunnel" "https://github.com/heiher/hev-socks5-tunnel/releases/latest/download/hev-socks5-tunnel-freebsd-x86_64"; then
-    chmod +x "${OUTPUT_DIR}/hev-socks5-tunnel"
-    echo "    -> hev-socks5-tunnel 官方稳定版获取成功"
-else
-    echo "    -> 未能直接下载 hev-socks5-tunnel 预编译二进制，将在 FreeBSD VM 步骤中通过源码 Release Tag 编译"
+echo "==> [5/6] 检查/下载 hev-socks5-tunnel 官方发布稳定版 (v${HEV_TUNNEL_VERSION#v})..."
+HEV_DL_URL="https://github.com/heiher/hev-socks5-tunnel/releases/download/${HEV_TUNNEL_VERSION}/hev-socks5-tunnel-freebsd-x86_64"
+if ! curl -fsSL -o "${OUTPUT_DIR}/hev-socks5-tunnel" "${HEV_DL_URL}"; then
+    HEV_DL_URL="https://github.com/heiher/hev-socks5-tunnel/releases/download/v${HEV_TUNNEL_VERSION#v}/hev-socks5-tunnel-freebsd-x86_64"
+    curl -fsSL -o "${OUTPUT_DIR}/hev-socks5-tunnel" "${HEV_DL_URL}" || true
 fi
 
-echo "==> [6/6] 检查/下载 Xray-core 官方已发布稳定版 (FreeBSD 64-bit)..."
+if [ -f "${OUTPUT_DIR}/hev-socks5-tunnel" ] && [ -s "${OUTPUT_DIR}/hev-socks5-tunnel" ]; then
+    chmod +x "${OUTPUT_DIR}/hev-socks5-tunnel"
+    echo "    -> hev-socks5-tunnel (v${HEV_TUNNEL_VERSION#v}) 官方稳定版获取成功"
+else
+    rm -f "${OUTPUT_DIR}/hev-socks5-tunnel"
+    echo "    -> 未能直接下载 hev-socks5-tunnel 预编译二进制，将在 FreeBSD VM 步骤中通过源码 Tag (${HEV_TUNNEL_VERSION}) 编译"
+fi
+
+XRAY_TAG="v${XRAY_VERSION#v}"
+echo "==> [6/6] 检查/下载 Xray-core 官方发布稳定版 (${XRAY_TAG})..."
 XRAY_DL_DIR="${BUILD_TMP}/xray-dl"
 mkdir -p "${XRAY_DL_DIR}" "${WORKSPACE_DIR}/dist/share/xray"
-if curl -fsSL -o "${XRAY_DL_DIR}/xray.zip" "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-freebsd-64.zip"; then
+if curl -fsSL -o "${XRAY_DL_DIR}/xray.zip" "https://github.com/XTLS/Xray-core/releases/download/${XRAY_TAG}/Xray-freebsd-64.zip"; then
     if command -v unzip >/dev/null 2>&1; then
         unzip -q -o "${XRAY_DL_DIR}/xray.zip" -d "${XRAY_DL_DIR}/"
     else
@@ -189,9 +201,9 @@ if curl -fsSL -o "${XRAY_DL_DIR}/xray.zip" "https://github.com/XTLS/Xray-core/re
     [ -f "${XRAY_DL_DIR}/xray" ] && cp "${XRAY_DL_DIR}/xray" "${OUTPUT_DIR}/xray" && chmod +x "${OUTPUT_DIR}/xray"
     [ -f "${XRAY_DL_DIR}/geoip.dat" ] && cp "${XRAY_DL_DIR}/geoip.dat" "${WORKSPACE_DIR}/dist/share/xray/"
     [ -f "${XRAY_DL_DIR}/geosite.dat" ] && cp "${XRAY_DL_DIR}/geosite.dat" "${WORKSPACE_DIR}/dist/share/xray/"
-    echo "    -> Xray-core 官方稳定版获取并解压成功"
+    echo "    -> Xray-core (${XRAY_TAG}) 官方稳定版获取并解压成功"
 else
-    echo "    [WARN] Xray-core 官方下载失败，跳过打包"
+    echo "    [WARN] Xray-core (${XRAY_TAG}) 官方下载失败，跳过打包"
 fi
 
 # ------------------------------------------------------------------------------

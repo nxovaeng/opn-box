@@ -21,6 +21,8 @@ REPO_OWNER="${REPO_OWNER:-opn-box}"
 REPO_NAME="${REPO_NAME:-opn-box}"
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-opnbox.zro.qzz.io}"
 BUILD_DATE="${BUILD_DATE:-$(date +%Y.%m.%d)}"
+HEV_TUNNEL_VERSION="${HEV_TUNNEL_VERSION:-2.17.1}"
+XRAY_VERSION="${XRAY_VERSION:-26.7.11}"
 
 # 命令行参数解析
 while [ $# -gt 0 ]; do
@@ -39,6 +41,10 @@ while [ $# -gt 0 ]; do
       CUSTOM_DOMAIN="$2"; shift 2 ;;
     --build-date)
       BUILD_DATE="$2"; shift 2 ;;
+    --hev-version)
+      HEV_TUNNEL_VERSION="$2"; shift 2 ;;
+    --xray-version)
+      XRAY_VERSION="$2"; shift 2 ;;
     -h|--help)
       echo "用法: $0 [选项]"
       echo "选项:"
@@ -49,6 +55,8 @@ while [ $# -gt 0 ]; do
       echo "  --repo-name <name>     GitHub 仓库名称"
       echo "  --domain <domain>      自定义域名 (例如: opnbox.zro.qzz.io)"
       echo "  --build-date <date>    自编译包版本号 (默认: YYYY.MM.DD，例如: $(date +%Y.%m.%d))"
+      echo "  --hev-version <ver>    hev-socks5-tunnel 固定版本号 (默认: ${HEV_TUNNEL_VERSION})"
+      echo "  --xray-version <ver>   xray-core 固定版本号 (默认: ${XRAY_VERSION})"
       exit 0
       ;;
     *)
@@ -57,6 +65,9 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+HEV_TUNNEL_VERSION="${HEV_TUNNEL_VERSION#v}"
+XRAY_VERSION="${XRAY_VERSION#v}"
 
 # 计算对外访问 URL 与项目主页
 if [ -n "${CUSTOM_DOMAIN}" ]; then
@@ -82,6 +93,8 @@ echo " 发布目录:   ${PUBLISH_DIR}"
 echo " 当前系统ABI: ${ABI}"
 echo " 仓库终端URL: ${CLIENT_REPO_URL}"
 echo " 自编版本号:  ${BUILD_DATE} (构建日期 年.月.日)"
+echo " 官源 hev 版本: v${HEV_TUNNEL_VERSION}"
+echo " 官源 xray 版本: v${XRAY_VERSION}"
 echo "=========================================================="
 
 # 1. 准备 Staging 目录结构
@@ -102,24 +115,21 @@ mkdir -p "${OUTPUT_DIR}/${ABI}" "${OUTPUT_DIR}/All"
 # 1.1 在 FreeBSD 原生环境中源码编译 hev-socks5-tunnel (若尚未下载到预编译稳定版)
 if [ ! -f "${DIST_DIR}/bin/hev-socks5-tunnel" ]; then
   if command -v gmake >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
-    echo "==> [FreeBSD 原生编译] 正在通过稳定 Release Tag 源码编译 hev-socks5-tunnel..."
+    echo "==> [FreeBSD 原生编译] 正在通过指定稳定标签 (${HEV_TUNNEL_VERSION}) 源码编译 hev-socks5-tunnel..."
     HEV_SRC_DIR="/tmp/hev-socks5-tunnel-src"
     rm -rf "${HEV_SRC_DIR}"
-    git clone --recursive https://github.com/heiher/hev-socks5-tunnel.git "${HEV_SRC_DIR}"
+    git clone --branch "${HEV_TUNNEL_VERSION}" --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel.git "${HEV_SRC_DIR}" 2>/dev/null || \
+      git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel.git "${HEV_SRC_DIR}"
     (
       cd "${HEV_SRC_DIR}"
-      LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "")
-      if [ -n "${LATEST_TAG}" ]; then
-        echo "    -> 检出官方稳定版本标签: ${LATEST_TAG}"
-        git checkout "${LATEST_TAG}" 2>/dev/null || true
-        git submodule update --init --recursive
-      fi
+      git checkout "${HEV_TUNNEL_VERSION}" 2>/dev/null || git checkout "v${HEV_TUNNEL_VERSION}" 2>/dev/null || true
+      git submodule update --init --recursive
       gmake
       mkdir -p "${DIST_DIR}/bin"
       cp bin/hev-socks5-tunnel "${DIST_DIR}/bin/"
     )
     rm -rf "${HEV_SRC_DIR}"
-    echo "    -> hev-socks5-tunnel 原生编译成功！"
+    echo "    -> hev-socks5-tunnel (${HEV_TUNNEL_VERSION}) 原生编译成功！"
   else
     echo "提示: 未检测到 gmake 或 git，跳过 hev-socks5-tunnel 原生源码编译"
   fi
@@ -314,10 +324,10 @@ fi
 # 3.6 Package: hev-socks5-tunnel (高性能 Tun2Socks 代理与 WebUI 管理器)
 # ------------------------------------------------------------------------------
 if [ -f "${STAGE_DIR}/usr/local/bin/hev-socks5-tunnel" ] || [ -f "${STAGE_DIR}/usr/local/bin/hev-controller" ]; then
-  echo "==> 打包 hev-socks5-tunnel (Tun2Socks + Controller)..."
+  echo "==> 打包 hev-socks5-tunnel (Tun2Socks + Controller, v${HEV_TUNNEL_VERSION})..."
   cat << EOF > /tmp/manifest_hev
 name: hev-socks5-tunnel
-version: "2.13.0"
+version: "${HEV_TUNNEL_VERSION}"
 origin: net/hev-socks5-tunnel
 comment: "High-performance Tun2Socks proxy bridge and Web UI manager"
 desc: "hev-socks5-tunnel compiled from source with coroutines and hev-controller WebUI"
@@ -341,10 +351,10 @@ fi
 # 3.7 Package: xray-core (官方稳定版代理内核，原生支持 xhttp、VLESS 与 SNI 嗅探)
 # ------------------------------------------------------------------------------
 if [ -f "${STAGE_DIR}/usr/local/bin/xray" ]; then
-  echo "==> 打包 xray-core (官方稳定版)..."
+  echo "==> 打包 xray-core (官方稳定版, v${XRAY_VERSION})..."
   cat << EOF > /tmp/manifest_xray
 name: xray-core
-version: "25.1.30"
+version: "${XRAY_VERSION}"
 origin: security/xray-core
 comment: "Xray-core proxy engine with VLESS, xhttp and sniffing support"
 desc: "Official Xray-core pre-compiled release packaged for OPNsense"

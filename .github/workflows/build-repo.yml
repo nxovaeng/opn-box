@@ -13,6 +13,16 @@ on:
         required: false
         type: boolean
         default: false
+      hev_version:
+        description: 'hev-socks5-tunnel stable version'
+        required: false
+        type: string
+        default: '2.17.1'
+      xray_version:
+        description: 'xray-core stable version'
+        required: false
+        type: string
+        default: '26.7.11'
 
 permissions:
   contents: write
@@ -25,6 +35,8 @@ concurrency:
 
 env:
   CUSTOM_DOMAIN: opnbox.zro.qzz.io
+  HEV_TUNNEL_VERSION: ${{ github.event.inputs.hev_version || '2.17.1' }}
+  XRAY_VERSION: ${{ github.event.inputs.xray_version || '26.7.11' }}
 
 jobs:
   build-and-deploy:
@@ -69,7 +81,9 @@ jobs:
               --publish-dir "$GITHUB_WORKSPACE/public" \
               --repo-owner "${{ github.repository_owner }}" \
               --repo-name "${{ github.event.repository.name }}" \
-              --domain "${{ env.CUSTOM_DOMAIN }}"
+              --domain "${{ env.CUSTOM_DOMAIN }}" \
+              --hev-version "${{ env.HEV_TUNNEL_VERSION }}" \
+              --xray-version "${{ env.XRAY_VERSION }}"
 
       # Step 3: Generate Repository Portal Landing Page (.nojekyll, CNAME & index.html)
       - name: Generate Repository Portal Page
