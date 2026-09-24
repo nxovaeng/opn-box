@@ -1,0 +1,63 @@
+site_name: OPN-Box 技术文档与软件源
+site_description: 适用于 OPNsense 26.x (FreeBSD 15) 的高性能策略路由与 DNS 动态分流套件
+site_author: opn-box
+site_url: https://opnbox.zro.qzz.io/
+repo_url: https://github.com/opn-box/opn-box
+repo_name: opn-box/opn-box
+
+docs_dir: docs
+
+theme:
+  name: material
+  language: zh
+  palette:
+    # 浅色模式
+    - scheme: default
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: 切换至暗黑模式
+    # 暗黑模式
+    - scheme: slate
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: 切换至浅色模式
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - 首页与软件源安装: index.md
+  - 01. 核心设计哲学与架构: 01-design-philosophy.md
+  - 02. DNS分流与PF同步引擎: 02-dns-and-pf-engine.md
+  - 03. 数据平面(TUN与Xray): 03-dataplane-tun-xray.md
+  - 04. 控制平面与OPNsense集成: 04-control-plane-and-ui.md
+  - 05. 规则库生态与运维维护: 05-rules-and-maintenance.md
+  - 06. 架构演进与集成总结: 06-evolution-and-modular-integration.md

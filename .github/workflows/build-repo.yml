@@ -85,8 +85,17 @@ jobs:
               --hev-version "${{ env.HEV_TUNNEL_VERSION }}" \
               --xray-version "${{ env.XRAY_VERSION }}"
 
-      # Step 3: Generate Repository Portal Landing Page (.nojekyll, CNAME & index.html)
-      - name: Generate Repository Portal Page
+      # Step 3: Generate Repository Portal & MkDocs Documentation Site
+      - name: Setup Python for MkDocs
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install MkDocs Material
+        run: |
+          pip install --no-cache-dir mkdocs-material
+
+      - name: Generate Repository Portal & Documentation Site
         run: |
           chmod +x scripts/generate_index.sh
           ./scripts/generate_index.sh public "${{ github.repository_owner }}" "${{ github.event.repository.name }}" "${{ env.CUSTOM_DOMAIN }}"
