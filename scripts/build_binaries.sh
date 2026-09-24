@@ -159,7 +159,15 @@ if [ "${BUILD_SINGBOX:-1}" = "1" ]; then
     echo "    -> sing-box (自编译 + 本地补丁) 编译成功"
 fi
 
+# ------------------------------------------------------------------------------
+# 6. 同步配置文件模板与 rc.d 服务启动脚本至 dist/ 目录
+# ------------------------------------------------------------------------------
+mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc"
+[ -f "${WORKSPACE_DIR}/rc.d/pf_aliasd" ] && cp "${WORKSPACE_DIR}/rc.d/pf_aliasd" "${WORKSPACE_DIR}/dist/rc.d/"
+[ -f "${WORKSPACE_DIR}/config.example.yaml" ] && cp "${WORKSPACE_DIR}/config.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns.yaml.example"
+
 echo "=========================================================="
 echo " 自编译完成！产物列表 (全量 FreeBSD 64位 ELF 二进制):"
 ls -lh "${OUTPUT_DIR}"
 echo "=========================================================="
+

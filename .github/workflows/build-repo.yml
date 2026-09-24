@@ -50,12 +50,8 @@ jobs:
           BUILD_SINGBOX: ${{ github.event.inputs.build_singbox != false && '1' || '0' }}
           BUILD_MOSDNS_X: ${{ github.event.inputs.build_mosdns_x == true && '1' || '0' }}
         run: |
-          mkdir -p dist/bin dist/etc dist/rc.d
           chmod +x scripts/build_binaries.sh
           ./scripts/build_binaries.sh dist/bin
-
-          cp rc.d/pf_aliasd dist/rc.d/
-          cp config.example.yaml dist/etc/mosdns.yaml.example
 
       # Step 2: Native FreeBSD Packaging and Repository Generation
       - name: Package & Create Repo in FreeBSD 14 VM
@@ -66,179 +62,14 @@ jobs:
           prepare: |
             pkg install -y pkg
           run: |
-            ABI=$(pkg config abi)
-            echo "Current FreeBSD Target ABI: $ABI"
-
-            mkdir -p /tmp/stage/usr/local/sbin /tmp/stage/usr/local/bin /tmp/stage/usr/local/etc/rc.d /tmp/stage/usr/local/etc/mosdns
-            mkdir -p repo_output/$ABI repo_output/All
-
-            # Copy self-compiled binaries into staging tree
-            cp dist/bin/pf-aliasd /tmp/stage/usr/local/sbin/
-            cp dist/rc.d/pf_aliasd /tmp/stage/usr/local/etc/rc.d/
-            [ -f dist/bin/mosdns ] && cp dist/bin/mosdns /tmp/stage/usr/local/bin/
-            [ -f dist/bin/mosdns-x ] && cp dist/bin/mosdns-x /tmp/stage/usr/local/bin/
-            [ -f dist/bin/mosdns-controller ] && cp dist/bin/mosdns-controller /tmp/stage/usr/local/bin/
-            [ -f dist/bin/sing-box ] && cp dist/bin/sing-box /tmp/stage/usr/local/bin/
-            cp dist/etc/mosdns.yaml.example /tmp/stage/usr/local/etc/mosdns/config.yaml.sample
-
-            chmod +x /tmp/stage/usr/local/sbin/* /tmp/stage/usr/local/bin/* /tmp/stage/usr/local/etc/rc.d/*
-
-            # 1. Package: pf-aliasd
-            cat << 'EOF' > /tmp/manifest_pf_aliasd
-            name: pf-aliasd
-            version: "1.0.0"
-            origin: net/pf-aliasd
-            comment: "Packet Filter Alias Daemon for OPNsense External Aliases"
-            desc: "Zero-race PF table sync daemon with min-heap TTL garbage collection"
-            maintainer: "admin@opn-box.local"
-            www: "https://github.com/${{ github.repository }}"
-            prefix: /usr/local
-            categories: [net]
-            arch: "FreeBSD:*:amd64"
-            EOF
-            cat << 'EOF' > /tmp/plist_pf_aliasd
-            sbin/pf-aliasd
-            etc/rc.d/pf_aliasd
-            EOF
-            pkg create -M /tmp/manifest_pf_aliasd -p /tmp/plist_pf_aliasd -r /tmp/stage -o repo_output/All
-
-            # 2. Package: mosdns (官方原版 v5.3.4，嵌入 pf_alias 插件)
-            if [ -f /tmp/stage/usr/local/bin/mosdns ]; then
-              cat << 'EOF' > /tmp/manifest_mosdns
-              name: mosdns
-              version: "5.3.4"
-              origin: dns/mosdns
-              comment: "Official MosDNS v5.3.4 with pf_alias plugin"
-              desc: "Official MosDNS v5.3.4 compiled from source with pf_alias for OPNsense"
-              maintainer: "admin@opn-box.local"
-              www: "https://github.com/${{ github.repository }}"
-              prefix: /usr/local
-              categories: [dns]
-              arch: "FreeBSD:*:amd64"
-              deps: {
-                pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
-              }
-            EOF
-              cat << 'EOF' > /tmp/plist_mosdns
-              bin/mosdns
-              etc/mosdns/config.yaml.sample
-            EOF
-              pkg create -M /tmp/manifest_mosdns -p /tmp/plist_mosdns -r /tmp/stage -o repo_output/All
-            fi
-
-            # 3. Package: mosdns-x
-            if [ -f /tmp/stage/usr/local/bin/mosdns-x ]; then
-              cat << 'EOF' > /tmp/manifest_mosdns_x
-              name: mosdns-x
-              version: "26.1.0"
-              origin: dns/mosdns-x
-              comment: "High-performance modular DNS forwarder with DoQ, DoH3 and pf_alias"
-              desc: "MosDNS-X engine compiled from source with pf_alias plugin for OPNsense"
-              maintainer: "admin@opn-box.local"
-              www: "https://github.com/${{ github.repository }}"
-              prefix: /usr/local
-              categories: [dns]
-              arch: "FreeBSD:*:amd64"
-              deps: {
-                pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
-              }
-            EOF
-              cat << 'EOF' > /tmp/plist_mosdns_x
-              bin/mosdns-x
-              etc/mosdns/config.yaml.sample
-            EOF
-              pkg create -M /tmp/manifest_mosdns_x -p /tmp/plist_mosdns_x -r /tmp/stage -o repo_output/All
-            fi
-
-            # 4. Package: mosdns-controller
-            if [ -f /tmp/stage/usr/local/bin/mosdns-controller ]; then
-              cat << 'EOF' > /tmp/manifest_controller
-              name: mosdns-controller
-              version: "1.0.0"
-              origin: dns/mosdns-controller
-              comment: "Web UI and Dynamic Rule Management Controller for MosDNS"
-              desc: "mosdns-controller compiled from luoye663/mosdns-controller source for OPNsense"
-              maintainer: "admin@opn-box.local"
-              www: "https://github.com/${{ github.repository }}"
-              prefix: /usr/local
-              categories: [dns]
-              arch: "FreeBSD:*:amd64"
-            EOF
-              cat << 'EOF' > /tmp/plist_controller
-              bin/mosdns-controller
-            EOF
-              pkg create -M /tmp/manifest_controller -p /tmp/plist_controller -r /tmp/stage -o repo_output/All
-            fi
-
-            # 5. Package: sing-box (with local FreeBSD TUN patches)
-            if [ -f /tmp/stage/usr/local/bin/sing-box ]; then
-              cat << 'EOF' > /tmp/manifest_singbox
-              name: sing-box
-              version: "1.13.14"
-              origin: net/sing-box
-              comment: "Universal proxy platform with FreeBSD TUN patches"
-              desc: "sing-box compiled with local FreeBSD patches for FreeBSD/OPNsense"
-              maintainer: "admin@opn-box.local"
-              www: "https://github.com/${{ github.repository }}"
-              prefix: /usr/local
-              categories: [net]
-              arch: "FreeBSD:*:amd64"
-            EOF
-              cat << 'EOF' > /tmp/plist_singbox
-              bin/sing-box
-            EOF
-              pkg create -M /tmp/manifest_singbox -p /tmp/plist_singbox -r /tmp/stage -o repo_output/All
-            fi
-
-            # 6. Package: os-mosdns (OPNsense UI & Service Plugin)
-            mkdir -p /tmp/stage-ui/usr/local
-            cp -r src/os-mosdns/src/* /tmp/stage-ui/usr/local/
-            cat << 'EOF' > /tmp/manifest_os_mosdns
-            name: os-mosdns
-            version: "1.0.0"
-            origin: opnsense/os-mosdns
-            comment: "MosDNS Dynamic Routing Engine with pf-aliasd & Controller UI"
-            desc: "OPNsense WebGUI plugin for MosDNS with pf-aliasd"
-            maintainer: "admin@opn-box.local"
-            www: "https://github.com/${{ github.repository }}"
-            prefix: /usr/local
-            categories: [opnsense]
-            arch: "*"
-            deps: {
-              pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" },
-              mosdns: { version: "5.3.4", origin: "dns/mosdns" }
-            }
-            EOF
-            cat << 'EOF' > /tmp/plist_os_mosdns
-            opnsense/service/conf/actions.d/actions_mosdns.conf
-            opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml
-            EOF
-            pkg create -M /tmp/manifest_os_mosdns -p /tmp/plist_os_mosdns -r /tmp/stage-ui -o repo_output/All
-
-            # Generate FreeBSD repository catalog
-            pkg repo repo_output/All
-
-            # Compatibility: support root URL, ${ABI}, FreeBSD:14:amd64 and FreeBSD:15:amd64
-            mkdir -p repo_output/FreeBSD:14:amd64 repo_output/FreeBSD:15:amd64
-            cp repo_output/All/* repo_output/$ABI/
-            cp repo_output/All/* repo_output/FreeBSD:14:amd64/
-            cp repo_output/All/* repo_output/FreeBSD:15:amd64/
-            cp repo_output/All/* repo_output/
-
-            # Generate opnbox.conf client repository configuration
-            cat << 'EOF' > repo_output/opnbox.conf
-            opnbox: {
-              url: "https://${{ env.CUSTOM_DOMAIN }}/${ABI}",
-              mirror_type: "http",
-              signature_type: "none",
-              priority: 10,
-              enabled: yes
-            }
-            EOF
-
-            # Copy to final publish directory
-            mkdir -p $GITHUB_WORKSPACE/public
-            cp -r repo_output/* $GITHUB_WORKSPACE/public/
+            chmod +x scripts/package_repo.sh
+            ./scripts/package_repo.sh \
+              --dist-dir dist \
+              --output-dir repo_output \
+              --publish-dir "$GITHUB_WORKSPACE/public" \
+              --repo-owner "${{ github.repository_owner }}" \
+              --repo-name "${{ github.event.repository.name }}" \
+              --domain "${{ env.CUSTOM_DOMAIN }}"
 
       # Step 3: Generate Repository Portal Landing Page (.nojekyll, CNAME & index.html)
       - name: Generate Repository Portal Page
