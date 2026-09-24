@@ -47,7 +47,7 @@ jobs:
       # Step 1: 100% 源码自编译 (绝不使用第三方预编译二进制)
       - name: Build All FreeBSD Binaries from Source
         env:
-          BUILD_SINGBOX: ${{ github.event.inputs.build_singbox != false && '1' || '0' }}
+          BUILD_SINGBOX: ${{ github.event.inputs.build_singbox != false && github.event.inputs.build_singbox != 'false' && '1' || '0' }}
           BUILD_MOSDNS_X: ${{ github.event.inputs.build_mosdns_x == true && '1' || '0' }}
         run: |
           chmod +x scripts/build_binaries.sh

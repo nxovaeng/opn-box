@@ -20,6 +20,7 @@ PUBLISH_DIR="${WORKSPACE_DIR}/public"
 REPO_OWNER="${REPO_OWNER:-opn-box}"
 REPO_NAME="${REPO_NAME:-opn-box}"
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-opnbox.zro.qzz.io}"
+BUILD_DATE="${BUILD_DATE:-$(date +%Y.%m.%d)}"
 
 # 命令行参数解析
 while [ $# -gt 0 ]; do
@@ -36,6 +37,8 @@ while [ $# -gt 0 ]; do
       REPO_NAME="$2"; shift 2 ;;
     --domain)
       CUSTOM_DOMAIN="$2"; shift 2 ;;
+    --build-date)
+      BUILD_DATE="$2"; shift 2 ;;
     -h|--help)
       echo "用法: $0 [选项]"
       echo "选项:"
@@ -45,6 +48,7 @@ while [ $# -gt 0 ]; do
       echo "  --repo-owner <owner>   GitHub 仓库拥有者"
       echo "  --repo-name <name>     GitHub 仓库名称"
       echo "  --domain <domain>      自定义域名 (例如: opnbox.zro.qzz.io)"
+      echo "  --build-date <date>    自编译包版本号 (默认: YYYY.MM.DD，例如: $(date +%Y.%m.%d))"
       exit 0
       ;;
     *)
@@ -77,6 +81,7 @@ echo " 目标源目录: ${OUTPUT_DIR}"
 echo " 发布目录:   ${PUBLISH_DIR}"
 echo " 当前系统ABI: ${ABI}"
 echo " 仓库终端URL: ${CLIENT_REPO_URL}"
+echo " 自编版本号:  ${BUILD_DATE} (构建日期 年.月.日)"
 echo "=========================================================="
 
 # 1. 准备 Staging 目录结构
@@ -185,10 +190,10 @@ chmod +x "${STAGE_DIR}/usr/local/sbin/"* "${STAGE_DIR}/usr/local/bin/"* "${STAGE
 # 3.1 Package: pf-aliasd
 # ------------------------------------------------------------------------------
 if [ -f "${STAGE_DIR}/usr/local/sbin/pf-aliasd" ]; then
-  echo "==> 打包 pf-aliasd..."
+  echo "==> 打包 pf-aliasd (自编: ${BUILD_DATE})..."
   cat << EOF > /tmp/manifest_pf_aliasd
 name: pf-aliasd
-version: "1.0.0"
+version: "${BUILD_DATE}"
 origin: net/pf-aliasd
 comment: "Packet Filter Alias Daemon for OPNsense External Aliases"
 desc: "Zero-race PF table sync daemon with min-heap TTL garbage collection"
@@ -209,7 +214,7 @@ fi
 # 3.2 Package: mosdns (官方原版 v5.3.4，嵌入 pf_alias 插件)
 # ------------------------------------------------------------------------------
 if [ -f "${STAGE_DIR}/usr/local/bin/mosdns" ]; then
-  echo "==> 打包 mosdns (v5.3.4 + pf_alias)..."
+  echo "==> 打包 mosdns (官方源码 v5.3.4 + pf_alias)..."
   cat << EOF > /tmp/manifest_mosdns
 name: mosdns
 version: "5.3.4"
@@ -222,7 +227,7 @@ prefix: /usr/local
 categories: [dns]
 arch: "FreeBSD:*:amd64"
 deps: {
-  pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
+  pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" }
 }
 EOF
   cat << EOF > /tmp/plist_mosdns
@@ -233,13 +238,13 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.3 Package: mosdns-x (演进版，支持 DoQ/DoH3)
+# 3.3 Package: mosdns-x (演进版，支持 DoQ/DoH3，自编译)
 # ------------------------------------------------------------------------------
 if [ -f "${STAGE_DIR}/usr/local/bin/mosdns-x" ]; then
-  echo "==> 打包 mosdns-x..."
+  echo "==> 打包 mosdns-x (自编: ${BUILD_DATE})..."
   cat << EOF > /tmp/manifest_mosdns_x
 name: mosdns-x
-version: "26.1.0"
+version: "${BUILD_DATE}"
 origin: dns/mosdns-x
 comment: "High-performance modular DNS forwarder with DoQ, DoH3 and pf_alias"
 desc: "MosDNS-X engine compiled from source with pf_alias plugin for OPNsense"
@@ -249,7 +254,7 @@ prefix: /usr/local
 categories: [dns]
 arch: "FreeBSD:*:amd64"
 deps: {
-  pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" }
+  pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" }
 }
 EOF
   cat << EOF > /tmp/plist_mosdns_x
@@ -260,13 +265,13 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.4 Package: mosdns-controller (Web UI 面板与控制器)
+# 3.4 Package: mosdns-controller (Web UI 面板与控制器，自编译)
 # ------------------------------------------------------------------------------
 if [ -f "${STAGE_DIR}/usr/local/bin/mosdns-controller" ]; then
-  echo "==> 打包 mosdns-controller..."
+  echo "==> 打包 mosdns-controller (自编: ${BUILD_DATE})..."
   cat << EOF > /tmp/manifest_controller
 name: mosdns-controller
-version: "1.0.0"
+version: "${BUILD_DATE}"
 origin: dns/mosdns-controller
 comment: "Web UI and Dynamic Rule Management Controller for MosDNS"
 desc: "mosdns-controller compiled from luoye663/mosdns-controller source for OPNsense"
@@ -360,14 +365,14 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.8 Package: os-mosdns (OPNsense WebGUI 插件)
+# 3.8 Package: os-mosdns (OPNsense WebGUI 插件，自编译)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-mosdns/src" ]; then
-  echo "==> 打包 os-mosdns (OPNsense UI 插件)..."
+  echo "==> 打包 os-mosdns (OPNsense UI 插件，自编: ${BUILD_DATE})..."
   cp -r "${WORKSPACE_DIR}/src/os-mosdns/src/"* "${STAGE_UI_DIR}/usr/local/"
   cat << EOF > /tmp/manifest_os_mosdns
 name: os-mosdns
-version: "1.0.0"
+version: "${BUILD_DATE}"
 origin: opnsense/os-mosdns
 comment: "MosDNS Dynamic Routing Engine with pf-aliasd & Controller UI"
 desc: "OPNsense WebGUI plugin for MosDNS with pf-aliasd"
@@ -377,7 +382,7 @@ prefix: /usr/local
 categories: [opnsense]
 arch: "*"
 deps: {
-  pf-aliasd: { version: "1.0.0", origin: "net/pf-aliasd" },
+  pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" },
   mosdns: { version: "5.3.4", origin: "dns/mosdns" }
 }
 EOF
