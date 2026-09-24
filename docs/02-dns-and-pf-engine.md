@@ -161,6 +161,80 @@ OPN-Box 在进程间通信中抛弃了低效的纯文本或 JSON 格式，在 `p
 - 进入 **Firewall -> Rules -> LAN**；
 - 创建一条通行规则：
   - **Destination**：选择别名 `GFW_Proxy`；
-  - **Gateway**：选择虚拟代理网关（即指向 `tun0` 网卡的 Gateway 目标）。
+  - **Gateway**：选择虚拟代理网关（即指向 `tun_box` 网卡的 Gateway 目标）。
 - 即可让所有命中该表的 IP 流量全部被内核底层拦截并导向 TUN 网卡。
+
+---
+
+## 六、DNS 监听接入方案：直接监听 53 端口 vs 5353 NAT 重定向
+
+在 OPNsense 部署 MosDNS 时，关于端口监听与流量接入，存在两种典型的落地模式：
+
+### 1. 方案 A：MosDNS 直接监听 53 端口（独占模式，强烈推荐）
+- **实现方式**：
+  - 在 OPNsense 的 **Services -> Unbound DNS -> General** 中，取消勾选 `Enable Unbound`（或者将其端口改为备用端口如 `5335`）；
+  - MosDNS 配置文件中将监听地址设置为 `listen_addr: ":53"`（同时监听 UDP 与 TCP）；
+  - OPNsense DHCP 服务直接向局域网终端下发路由网关 IP 作为 DNS 服务器。
+- **核心优势**：
+  - **链路最短、极致性能**：客户端直接直连 MosDNS，中间零 NAT 转换开销与进程转发开销；
+  - **真实客户端 IP 透传**：MosDNS 日志与统计可以直接看到内网客户端真实 IP，排查与监控极为直观。
+
+### 2. 方案 B：MosDNS 监听 5353 + Unbound 串联（保留 DHCP 域名特性）
+- **实现方式**：
+  - Unbound 依然监听 `:53`，保留内网 DHCP 主机名与本地域解析；
+  - 在 Unbound 的 **Query Forwarding** 中，将所有公网域名（`.`）全部转发至 `127.0.0.1:5353`（MosDNS）。
+- **适用场景**：适用于局域网内部高度依赖 OPNsense 原生 DHCP 主机名解析的复杂内网。
+
+### 3. 关键防御：为什么强烈建议配置一条 LAN 53 端口 NAT 劫持规则？
+局域网中常有部分智能设备（如电视盒子、部分手机或 IoT 设备）硬编码了公共 DNS（如 `8.8.8.8` 或 `114.114.114.114`），它们会绕过 DHCP 分发的 DNS 直接发起公网 53 端口查询。
+若不对这部分流量进行拦截，将导致其访问的境外 IP 无法触发 MosDNS 的 `pf_alias` 写入内核，从而造成代理失效或首包漏流。
+
+**OPNsense 最佳防漏流规则（Firewall -> NAT -> Port Forward）**：
+- **Interface**: LAN
+- **Protocol**: TCP/UDP
+- **Destination**: `invert (勾选反选)` -> `LAN address`（即凡是目的 IP 不是路由器本身的 53 流量）
+- **Destination Port**: `53 (DNS)`
+- **Redirect target IP**: 路由器网关 IP（如 `192.168.1.1`）
+- **Redirect target Port**: MosDNS 监听端口（`53` 或 `5353`）
+通过这条规则，局域网中所有私设 DNS 的请求均会被内核强行捕获并送入 MosDNS 分流流水线。
+
+---
+
+## 七、数据面解耦：为什么远程 DNS 走 SOCKS5 绝对不需要过 TUN？
+
+在许多传统代理方案中，DNS 查询常常陷入死锁：解析远程节点域名需要过 TUN，而 TUN 的转发又依赖 DNS 解析出来的目标 IP。OPN-Box 从根本上杜绝了这一死锁链条：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as 局域网客户端
+    participant MosDNS as MosDNS (:53)
+    participant XraySocks as Xray (127.0.0.1:10808)
+    participant PF as 内核 PF (<GFW_Proxy>)
+    participant TUN as hev-socks5-tunnel (tun_box)
+    participant VPS as 远端代理服务器
+
+    Note over MosDNS,XraySocks: 阶段一：纯控制面 DNS 解析 (不过 TUN)
+    Client->>MosDNS: 1. 解析 youtube.com
+    MosDNS->>XraySocks: 2. SOCKS5 TCP 请求 (lo0 本地回环)
+    XraySocks->>VPS: 3. 密文出站直连 (物理 WAN 网卡)
+    VPS-->>XraySocks: 4. 返回真实无污染 IP 142.250.x.x
+    XraySocks-->>MosDNS: 5. SOCKS5 响应完成
+    MosDNS->>PF: 6. pf_alias 同步入表 <GFW_Proxy>
+    MosDNS-->>Client: 7. 返回 DNS 响应报文
+
+    Note over Client,TUN: 阶段二：数据面业务连接 (仅此时过 TUN)
+    Client->>PF: 8. 发起业务 TCP SYN (目的: 142.250.x.x)
+    PF->>TUN: 9. 命中 <GFW_Proxy>，route-to (tun_box)
+    TUN->>XraySocks: 10. 转入代理核心
+    XraySocks->>VPS: 11. 代理传输业务数据
+```
+
+1. **L5/L7 回环隔离（Loopback Socket）**：
+   - MosDNS 在配置 `remote_socks5: "127.0.0.1:10808"` 后，发起海外 DNS 解析本质上是在本地回环设备（`lo0`）上与 Xray 建立标准的 SOCKS5 握手连接；
+   - 流量自始至终不离开主机回环，**完全不会接触 `tun_box` 虚拟网卡设备，也不会被 PF 防火墙的策略路由规则捕获**。
+2. **天然免疫策略路由死锁**：
+   - DNS 无论何时都能通过 SOCKS5 稳定拿到真实 IP，完全不依赖 TUN 的运行状态；
+   - 真正需要通过 TUN 导向代理通道的，仅仅是客户端在解析完成后发起的后续业务数据流（命中 `<GFW_Proxy>` 表的 IP）。
+
 

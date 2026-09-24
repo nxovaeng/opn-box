@@ -1044,6 +1044,17 @@ func generateXrayConfig(appData *AppData) (map[string]interface{}, error) {
 				"routeOnly":    true,
 			},
 		},
+		map[string]interface{}{
+			"tag":      "dns-in",
+			"port":     10853,
+			"listen":   "127.0.0.1",
+			"protocol": "dokodemo-door",
+			"settings": map[string]interface{}{
+				"address": "1.1.1.1",
+				"port":    53,
+				"network": "tcp,udp",
+			},
+		},
 	}
 
 	for _, in := range appData.Inbounds {
@@ -1115,6 +1126,10 @@ func generateXrayConfig(appData *AppData) (map[string]interface{}, error) {
 		"protocol": "blackhole",
 		"settings": map[string]interface{}{},
 	})
+	outbounds = append(outbounds, map[string]interface{}{
+		"tag":      "dns-out",
+		"protocol": "dns",
+	})
 
 	// 3. Routing rules
 	rules := []interface{}{}
@@ -1146,6 +1161,15 @@ func generateXrayConfig(appData *AppData) (map[string]interface{}, error) {
 		"outboundTag": "proxy-default",
 	})
 
+	// Prepend rule to route incoming DNS queries from dns-in directly to built-in DNS engine
+	rules = append([]interface{}{
+		map[string]interface{}{
+			"type":        "field",
+			"inboundTag": []string{"dns-in"},
+			"outboundTag": "dns-out",
+		},
+	}, rules...)
+
 	strategy := appData.DomainStrategy
 	if strategy == "" {
 		strategy = "AsIs"
@@ -1154,6 +1178,14 @@ func generateXrayConfig(appData *AppData) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"log": map[string]interface{}{
 			"loglevel": "warning",
+		},
+		"dns": map[string]interface{}{
+			"servers": []interface{}{
+				"tcp://1.1.1.1:53",
+				"tcp://8.8.8.8:53",
+				"https://1.1.1.1/dns-query",
+			},
+			"queryStrategy": "UseIP",
 		},
 		"inbounds":  inbounds,
 		"outbounds": outbounds,

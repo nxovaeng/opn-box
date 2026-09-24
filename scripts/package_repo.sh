@@ -201,7 +201,9 @@ elif [ -f "${DIST_DIR}/rc.d/xray_controller" ]; then
   cp "${DIST_DIR}/rc.d/xray_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
 fi
 
-if [ -f "${WORKSPACE_DIR}/config.example.yaml" ]; then
+if [ -f "${WORKSPACE_DIR}/config.mosdns.example.yaml" ]; then
+  cp "${WORKSPACE_DIR}/config.mosdns.example.yaml" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
+elif [ -f "${WORKSPACE_DIR}/config.example.yaml" ]; then
   cp "${WORKSPACE_DIR}/config.example.yaml" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
 elif [ -f "${DIST_DIR}/etc/mosdns.yaml.example" ]; then
   cp "${DIST_DIR}/etc/mosdns.yaml.example" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
@@ -221,6 +223,12 @@ if [ -f "${WORKSPACE_DIR}/config.xray.example.json" ]; then
   cp "${WORKSPACE_DIR}/config.xray.example.json" "${STAGE_DIR}/usr/local/etc/xray/config.json.sample"
 elif [ -f "${DIST_DIR}/etc/xray.json.example" ]; then
   cp "${DIST_DIR}/etc/xray.json.example" "${STAGE_DIR}/usr/local/etc/xray/config.json.sample"
+fi
+
+if [ -f "${WORKSPACE_DIR}/config.xray-controller.example.json" ]; then
+  cp "${WORKSPACE_DIR}/config.xray-controller.example.json" "${STAGE_DIR}/usr/local/etc/xray/controller_data.json.sample"
+elif [ -f "${DIST_DIR}/etc/xray-controller.json.example" ]; then
+  cp "${DIST_DIR}/etc/xray-controller.json.example" "${STAGE_DIR}/usr/local/etc/xray/controller_data.json.sample"
 fi
 
 chmod +x "${STAGE_DIR}/usr/local/sbin/"* "${STAGE_DIR}/usr/local/bin/"* "${STAGE_DIR}/usr/local/etc/rc.d/"* 2>/dev/null || true

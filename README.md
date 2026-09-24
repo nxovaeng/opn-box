@@ -57,8 +57,10 @@ opn-box/
 │   └── plugin/            # MosDNS v5 官方兼容 pf_alias 同步插件
 ├── rc.d/                  # FreeBSD 原生开机自启守护脚本 (pf_aliasd, xray, hev 等)
 ├── scripts/               # 编译流水线、软件源打包与规则库自动更新脚本
-├── src/os-mosdns/         # OPNsense 原生 WebGUI 插件模型、菜单与服务配置
-├── config.example.yaml    # MosDNS 粗粒度智能分流配置模板
+├── config.mosdns.example.yaml # MosDNS 粗粒度智能分流配置模板
+├── config.mosdns-controller.example.yaml # 自研 MosDNS 控制器配置模板
+├── config.hev-socks5-tunnel.example.yaml # Tun2Socks 隧道配置模板
+├── config.xray.example.json   # Xray 7层路由与内置 DNS 配置模板
 └── README.md
 ```
 

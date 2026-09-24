@@ -21,8 +21,15 @@ plugins:
     args:
       concurrent: 2
       upstreams:
+        # 方案一 (极速推荐): 经本地 Xray SOCKS5 代理走 TCP 远端查询 (低延迟，走加密隧道防污染)
+        - addr: "tcp://1.1.1.1:53"
+          socks5: "127.0.0.1:10808"
+        - addr: "tcp://8.8.8.8:53"
+          socks5: "127.0.0.1:10808"
+        # 方案二: 经本地 Xray SOCKS5 代理走 DoH 查询
         - addr: "https://1.1.1.1/dns-query"
-        - addr: "https://8.8.8.8/dns-query"
+          socks5: "127.0.0.1:10808"
+          enable_pipeline: true
 
   - tag: forward_local
     type: forward

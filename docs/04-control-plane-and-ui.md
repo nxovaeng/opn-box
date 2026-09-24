@@ -17,7 +17,7 @@
 
 | 控制器名称 | 守护服务与启动脚本 | 监听端口 | 核心管理职责 | 状态与配置持久化文件 |
 | :--- | :--- | :---: | :--- | :--- |
-| **MosDNS Controller** | `mosdns-controller` (`rc.d/mosdns-controller`) | `:5380` | • DNS 动态解析规则与黑白名单管理<br>• 上下游 DNS 解析组切换<br>• 客户端查询日志流排查 | `/usr/local/etc/mosdns/` |
+| **MosDNS Controller** | `mosdns_controller` (`rc.d/mosdns_controller`) | `:5380` | • 原生 Go 独立架构，内嵌现代化暗黑 SPA WebUI (零 Node/npm/SQLite 依赖)<br>• 3 种分流模式：白名单直连、黑名单代理、混合自定义模式<br>• 3 组规则库管理：直连 (`custom-direct.txt`)、代理 (`custom-proxy.txt`)、广告拦截 (`custom-block.txt`)<br>• 实时域名路由推演模拟器 (`/api/test-domain`)<br>• 远端 DNS SOCKS5 代理通道配置 (不过 TUN)<br>• 实时日志流 (`mosdns.log`, `pf-aliasd.log`) | `/usr/local/etc/mosdns/controller.yaml` |
 | **Tun2Socks Manager** | `hev-controller` (`rc.d/hev_controller`) | `:5382` | • `tun0` 网卡运行状态、PID 与实时日志<br>• MTU、多队列、IPv4/IPv6 参数可视化调优<br>• 本地 SOCKS5 桥接配置与一键重启 | `/usr/local/etc/hev-socks5-tunnel/config.yaml` |
 | **Xray Manager** | `xray-controller` (`rc.d/xray_controller`) | `:5384` | • 节点多协议订阅拉取与批量导入 (全支持 xhttp)<br>• 多并发 TCP Ping 节点时延测速<br>• 可视化 7 层域名与 GeoSite 路由规则编辑<br>• 局域网自定义入站 (SOCKS5/HTTP) 动态管理<br>• 自动语法预检 (`xray run -test`) 与热重载 | • 状态层: `controller_data.json`<br>• 运行时: `config.json` |
 
@@ -135,6 +135,7 @@ configctl netbox rules.update_mirror # 通过加速镜像触发规则库同步
 ```bash
 sysrc pf_aliasd_enable="YES"
 sysrc mosdns_enable="YES"
+sysrc mosdns_controller_enable="YES"
 sysrc hev_socks5_tunnel_enable="YES"
 sysrc hev_controller_enable="YES"
 sysrc xray_enable="YES"
@@ -144,6 +145,7 @@ sysrc xray_controller_enable="YES"
 ```bash
 service pf_aliasd start
 service mosdns start
+service mosdns_controller start
 service hev_socks5_tunnel start
 service hev_controller start
 service xray start

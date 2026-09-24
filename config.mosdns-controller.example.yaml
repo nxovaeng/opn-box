@@ -1,24 +1,68 @@
 # ==============================================================================
-# MosDNS Controller 默认配置文件样例
-# 安装位置建议: /usr/local/etc/mosdns/controller.yaml
+# MosDNS Controller 自研控制端默认配置文件样例
+# 安装位置建议: /usr/local/etc/mosdns/controller.yaml (或 controller_settings.json)
 # ==============================================================================
 
-server:
-  # Web UI 访问监听地址与端口
-  public_listen: "0.0.0.0:5380"
-  # 内部审计日志接收端监听地址与端口 (接收 mosdns query_audit 推送)
-  internal_listen: "127.0.0.1:5381"
+# ------------------------------------------------------------------------------
+# 1. 分流运行模式 (Routing Mode)
+# ------------------------------------------------------------------------------
+# 可选值:
+# - whitelist: 白名单直连模式 (推荐)。明确国内域名走国内直连，其余所有出海与未知域名走代理并入 PF 表。
+# - blacklist: 黑名单代理模式。明确 GFW 出海名单走代理并入 PF 表，其余域名全部走国内直连。
+# - custom:    自定义混合模式。直连列表直连，代理列表代理，未明确分类域名根据 custom_default_route 决定走向。
+mode: "whitelist"
 
-storage:
-  # SQLite 数据与日志持久化路径
-  path: "/var/db/mosdns-controller/controller.db"
+# 混合模式 (custom) 下未命中任何规则库的未知/未明确分类域名的默认兜底走向
+# 可选值: "proxy" (走代理并入表) 或 "direct" (走国内直连)
+custom_default_route: "proxy"
 
-mosdns:
-  # MosDNS API 插件通信接口
-  base_url: "http://127.0.0.1:9091"
-  # Controller 与 MosDNS 共享认证令牌文件 (32 字节随机 hex)
-  token_file: "/usr/local/etc/mosdns/controller.token"
+# ------------------------------------------------------------------------------
+# 2. 上下游 DNS 解析器配置 (DNS Forwarders)
+# ------------------------------------------------------------------------------
+# 国内直连上游 DNS 服务器列表 (UDP / TCP)
+local_dns:
+  - "223.5.5.5"
+  - "119.29.29.29"
 
-web:
-  # Web 登录会话过期时间
-  session_ttl: "24h"
+# 海外出海上游 DNS 服务器列表
+# 推荐配置:
+# - "tcp://1.1.1.1:53" (推荐: 极低握手延迟，经 SOCKS5 代理隧道加密无污染)
+# - "tcp://8.8.8.8:53"
+# - "127.0.0.1:10853"  (若 Xray 开启了内置 DNS 服务，可直接指向本地端口)
+# - "https://1.1.1.1/dns-query" (DoH 模式)
+remote_dns:
+  - "tcp://1.1.1.1:53"
+  - "tcp://8.8.8.8:53"
+  - "https://1.1.1.1/dns-query"
+
+# 远端 DNS SOCKS5 代理通道
+# 说明: 直接通过本地回环 SOCKS5 代理发起 TCP DNS 远端查询，不需要过 TUN 虚拟网卡，
+# 彻底杜绝本地网络断流、SNI 劫持与首包漏流。留空表示直连远端 DNS。
+remote_socks5: "127.0.0.1:10808"
+
+# ------------------------------------------------------------------------------
+# 3. 本地监听与 FreeBSD /dev/pf 内核零竞态同步参数
+# ------------------------------------------------------------------------------
+# MosDNS 本地监听地址与端口 (同时监听 UDP 与 TCP)
+listen_addr: "127.0.0.1:5353"
+
+# FreeBSD PF 动态外部别名表名 (需在 OPNsense Firewall -> Aliases 中创建 External 类型别名)
+pf_table: "GFW_Proxy"
+
+# 动态入表条目最小 TTL 钳位 (秒，防止 TTL 过小导致频繁刷新)
+min_ttl: 60
+
+# 动态入表条目最大 TTL 钳位 (秒，防止条目堆积打满防火墙内存)
+max_ttl: 86400
+
+# pf-aliasd 守护进程 Unix Domain Socket 通信路径
+pf_socket: "/var/run/pf-aliasd.sock"
+
+# 是否启用自定义阻止名单拦截 (custom-block.txt 广告或恶意域名阻断)
+block_enabled: true
+
+# 远程上游查询并发数
+concurrent: 2
+
+# MosDNS 日志级别 (debug, info, warn, error)
+log_level: "info"

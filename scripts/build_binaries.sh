@@ -48,23 +48,30 @@ fi
 echo "=========================================================="
 
 # ------------------------------------------------------------------------------
-# 1. 编译本地自研控制服务 (pf-aliasd, hev-controller, xray-controller)
+# 1. 编译本地自研控制服务 (pf-aliasd, mosdns-controller, hev-controller, xray-controller)
 # ------------------------------------------------------------------------------
-echo "==> [1/7] 编译本地 pf-aliasd 守护进程..."
+echo "==> [1/5] 编译本地 pf-aliasd 守护进程..."
 (
     cd "${WORKSPACE_DIR}"
     go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/pf-aliasd" ./cmd/pf-aliasd
 )
 echo "    -> pf-aliasd 编译成功"
 
-echo "==> [2/7] 编译本地 hev-controller (Tun2Socks Web 管理面板)..."
+echo "==> [2/5] 编译本地 mosdns-controller (MosDNS 粗粒度智能分流 Web 管理面板)..."
+(
+    cd "${WORKSPACE_DIR}"
+    go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/mosdns-controller" ./cmd/mosdns-controller
+)
+echo "    -> mosdns-controller 编译成功 (单二进制，内嵌 WebUI，支持白名单/黑名单/混合分流)"
+
+echo "==> [3/5] 编译本地 hev-controller (Tun2Socks Web 管理面板)..."
 (
     cd "${WORKSPACE_DIR}"
     go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/hev-controller" ./cmd/hev-controller
 )
 echo "    -> hev-controller 编译成功"
 
-echo "==> [3/7] 编译本地 xray-controller (Xray Manager Web 管理面板)..."
+echo "==> [4/5] 编译本地 xray-controller (Xray Manager Web 管理面板)..."
 (
     cd "${WORKSPACE_DIR}"
     go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/xray-controller" ./cmd/xray-controller
@@ -74,7 +81,7 @@ echo "    -> xray-controller 编译成功"
 # ------------------------------------------------------------------------------
 # 2. 从源码编译官方 mosdns (严格指定 v5.3.4，嵌入自研 pf_alias)
 # ------------------------------------------------------------------------------
-echo "==> [4/7] 编译 mosdns (官方源码 ${MOSDNS_VERSION}，嵌入自研 pf_alias)..."
+echo "==> [5/5] 编译 mosdns (官方源码 ${MOSDNS_VERSION}，嵌入自研 pf_alias)..."
 git clone --branch "${MOSDNS_VERSION}" --depth=1 https://github.com/IrineSistiana/mosdns.git "${BUILD_TMP}/mosdns"
 mkdir -p "${BUILD_TMP}/mosdns/plugin/executable/pf_alias"
 cp -r "${WORKSPACE_DIR}/pkg/plugin/"* "${BUILD_TMP}/mosdns/plugin/executable/pf_alias/"
@@ -87,34 +94,6 @@ cp -r "${WORKSPACE_DIR}/pkg/plugin/"* "${BUILD_TMP}/mosdns/plugin/executable/pf_
     go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/mosdns" .
 )
 echo "    -> mosdns (${MOSDNS_VERSION}) 编译成功"
-
-# ------------------------------------------------------------------------------
-# 3. 从源码编译 luoye663/mosdns-controller (Web UI 面板，内嵌生产打包 Web 静态资源)
-# ------------------------------------------------------------------------------
-echo "==> [5/7] 从源码拉取并编译 mosdns-controller (${MOSDNS_CONTROLLER_TAG})..."
-git clone --branch "${MOSDNS_CONTROLLER_TAG}" --depth=1 https://github.com/luoye663/mosdns-controller.git "${BUILD_TMP}/mosdns-controller"
-(
-    cd "${BUILD_TMP}/mosdns-controller"
-    if [ -d "web" ] && command -v npm >/dev/null 2>&1; then
-        echo "    -> 检测到 npm，开始构建 Web 前端生产资源并嵌入..."
-        (
-            cd web
-            npm ci || npm install
-            npm run build
-        )
-        rm -rf controller/internal/web/static/*
-        cp -R web/dist/. controller/internal/web/static/
-        echo "    -> Web 前端资源已成功嵌入 controller/internal/web/static"
-    else
-        echo "    [WARN] 未检测到 npm 或 web 目录，将使用内置 placeholder"
-    fi
-
-    cd controller
-    go build -trimpath -ldflags="-s -w -X 'github.com/managed-dns/controller/internal/version.ProjectVersion=${MOSDNS_CONTROLLER_TAG}' -X 'github.com/managed-dns/controller/internal/version.MosdnsBase=v5.3.4'" -o "${OUTPUT_DIR}/mosdns-controller" ./cmd/controller
-)
-if [ -f "${OUTPUT_DIR}/mosdns-controller" ]; then
-    echo "    -> mosdns-controller 编译成功 (含完整内嵌 WebUI)"
-fi
 
 # ------------------------------------------------------------------------------
 # 4. 可选：从源码编译 pmkol/mosdns-x (演进版，支持 DoQ/DoH3)
@@ -220,17 +199,23 @@ fi
 mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc" "${WORKSPACE_DIR}/dist/sbin"
 [ -f "${WORKSPACE_DIR}/scripts/update_rules.sh" ] && cp "${WORKSPACE_DIR}/scripts/update_rules.sh" "${WORKSPACE_DIR}/dist/sbin/update-opnbox-rules.sh" && chmod +x "${WORKSPACE_DIR}/dist/sbin/update-opnbox-rules.sh"
 [ -f "${WORKSPACE_DIR}/rc.d/pf_aliasd" ] && cp "${WORKSPACE_DIR}/rc.d/pf_aliasd" "${WORKSPACE_DIR}/dist/rc.d/"
+[ -f "${WORKSPACE_DIR}/rc.d/mosdns" ] && cp "${WORKSPACE_DIR}/rc.d/mosdns" "${WORKSPACE_DIR}/dist/rc.d/"
+[ -f "${WORKSPACE_DIR}/rc.d/mosdns_controller" ] && cp "${WORKSPACE_DIR}/rc.d/mosdns_controller" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" ] && cp "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_controller" ] && cp "${WORKSPACE_DIR}/rc.d/hev_controller" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/xray" ] && cp "${WORKSPACE_DIR}/rc.d/xray" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/xray_controller" ] && cp "${WORKSPACE_DIR}/rc.d/xray_controller" "${WORKSPACE_DIR}/dist/rc.d/"
-[ -f "${WORKSPACE_DIR}/config.example.yaml" ] && cp "${WORKSPACE_DIR}/config.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns.yaml.example"
+if [ -f "${WORKSPACE_DIR}/config.mosdns.example.yaml" ]; then
+    cp "${WORKSPACE_DIR}/config.mosdns.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns.yaml.example"
+elif [ -f "${WORKSPACE_DIR}/config.example.yaml" ]; then
+    cp "${WORKSPACE_DIR}/config.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns.yaml.example"
+fi
+[ -f "${WORKSPACE_DIR}/config.mosdns-controller.example.yaml" ] && cp "${WORKSPACE_DIR}/config.mosdns-controller.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns-controller.yaml.example"
 [ -f "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" ] && cp "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" "${WORKSPACE_DIR}/dist/etc/hev-socks5-tunnel.yaml.example"
 [ -f "${WORKSPACE_DIR}/config.xray.example.json" ] && cp "${WORKSPACE_DIR}/config.xray.example.json" "${WORKSPACE_DIR}/dist/etc/xray.json.example"
+[ -f "${WORKSPACE_DIR}/config.xray-controller.example.json" ] && cp "${WORKSPACE_DIR}/config.xray-controller.example.json" "${WORKSPACE_DIR}/dist/etc/xray-controller.json.example"
 
 echo "=========================================================="
 echo " 二进制准备完成！产物列表 (全量 FreeBSD 64位 ELF 二进制):"
 ls -lh "${OUTPUT_DIR}"
 echo "=========================================================="
-
-

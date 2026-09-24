@@ -4,7 +4,7 @@
 
 tunnel:
   # 虚拟网卡接口名称 (FreeBSD 原生 tun 接口)
-  name: tun0
+  name: tun_box
   # 数据包最大传输单元 (推荐 1500)
   mtu: 1500
   multi-queue: false

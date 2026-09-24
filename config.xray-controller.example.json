@@ -1,0 +1,118 @@
+{
+  "_comment": "Xray Controller 初始状态与预置分流模板 (安装位置: /usr/local/etc/xray/controller_data.json)",
+  "active_node_tag": "proxy-default",
+  "domain_strategy": "AsIs",
+  "subscriptions": [
+    {
+      "id": "sub-sample",
+      "name": "示例机场订阅 (可在WebUI更新或删除)",
+      "url": "https://example.com/api/v1/client/subscribe?token=xxx",
+      "last_update": 0,
+      "node_count": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "node-sample",
+      "tag": "proxy-default",
+      "name": "出海主流节点示例 (VLESS + xhttp + TLS)",
+      "protocol": "vless",
+      "address": "hk.example.com",
+      "port": 443,
+      "network": "xhttp",
+      "security": "tls",
+      "sni": "hk.example.com",
+      "path": "/xhttp-path",
+      "xhttp_mode": "packet-up",
+      "sub_id": "sub-sample",
+      "ping_rtt": 0,
+      "raw_outbound": {
+        "tag": "proxy-default",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "hk.example.com",
+              "port": 443,
+              "users": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000000",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "xhttp",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "hk.example.com"
+          },
+          "xhttpSettings": {
+            "path": "/xhttp-path",
+            "mode": "packet-up"
+          }
+        }
+      }
+    }
+  ],
+  "inbounds": [
+    {
+      "id": "in-lan-mixed",
+      "tag": "lan-mixed",
+      "protocol": "socks",
+      "listen": "0.0.0.0",
+      "port": 10809,
+      "enabled": false,
+      "sniffing": true,
+      "comment": "局域网终端专用代理 (SOCKS5，需在 OPNsense 防火墙放行 10809)"
+    },
+    {
+      "id": "in-lan-http",
+      "tag": "lan-http",
+      "protocol": "http",
+      "listen": "0.0.0.0",
+      "port": 10810,
+      "enabled": false,
+      "sniffing": true,
+      "comment": "局域网终端专用代理 (HTTP，需在 OPNsense 防火墙放行 10810)"
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule-ai",
+      "type": "domain",
+      "values": [
+        "geosite:openai",
+        "geosite:anthropic",
+        "domain:claude.ai"
+      ],
+      "outbound_tag": "proxy-default",
+      "enabled": true,
+      "comment": "AI 专用分流 (OpenAI / Claude)"
+    },
+    {
+      "id": "rule-media",
+      "type": "domain",
+      "values": [
+        "geosite:netflix",
+        "geosite:disney",
+        "geosite:youtube"
+      ],
+      "outbound_tag": "proxy-default",
+      "enabled": true,
+      "comment": "海外流媒体专用分流"
+    },
+    {
+      "id": "rule-direct",
+      "type": "domain",
+      "values": [
+        "geosite:cn"
+      ],
+      "outbound_tag": "direct",
+      "enabled": true,
+      "comment": "国内域名直连兜底 (直连出站)"
+    }
+  ]
+}

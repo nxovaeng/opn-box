@@ -2,6 +2,14 @@
   "log": {
     "loglevel": "warning"
   },
+  "dns": {
+    "servers": [
+      "tcp://1.1.1.1:53",
+      "tcp://8.8.8.8:53",
+      "https://1.1.1.1/dns-query"
+    ],
+    "queryStrategy": "UseIP"
+  },
   "inbounds": [
     {
       "tag": "hev-socks-in",
@@ -16,6 +24,17 @@
         "enabled": true,
         "destOverride": ["http", "tls", "quic"],
         "routeOnly": true
+      }
+    },
+    {
+      "tag": "dns-in",
+      "port": 10853,
+      "listen": "127.0.0.1",
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "1.1.1.1",
+        "port": 53,
+        "network": "tcp,udp"
       }
     }
   ],
@@ -50,6 +69,10 @@
       }
     },
     {
+      "tag": "dns-out",
+      "protocol": "dns"
+    },
+    {
       "tag": "direct",
       "protocol": "freedom",
       "settings": {}
@@ -60,10 +83,14 @@
     "rules": [
       {
         "type": "field",
+        "inboundTag": ["dns-in"],
+        "outboundTag": "dns-out"
+      },
+      {
+        "type": "field",
         "network": "tcp,udp",
         "outboundTag": "proxy-xhttp"
       }
     ]
   }
 }
-
