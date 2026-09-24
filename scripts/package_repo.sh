@@ -87,9 +87,30 @@ mkdir -p "${STAGE_DIR}/usr/local/sbin" \
          "${STAGE_DIR}/usr/local/bin" \
          "${STAGE_DIR}/usr/local/etc/rc.d" \
          "${STAGE_DIR}/usr/local/etc/mosdns" \
+         "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel" \
          "${STAGE_UI_DIR}/usr/local"
 
 mkdir -p "${OUTPUT_DIR}/${ABI}" "${OUTPUT_DIR}/All"
+
+# 1.1 在 FreeBSD 原生环境中源码编译 hev-socks5-tunnel (若尚未编译)
+if [ ! -f "${DIST_DIR}/bin/hev-socks5-tunnel" ]; then
+  if command -v gmake >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
+    echo "==> [FreeBSD 原生编译] 正在通过 gmake 编译 hev-socks5-tunnel..."
+    HEV_SRC_DIR="/tmp/hev-socks5-tunnel-src"
+    rm -rf "${HEV_SRC_DIR}"
+    git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel.git "${HEV_SRC_DIR}"
+    (
+      cd "${HEV_SRC_DIR}"
+      gmake
+      mkdir -p "${DIST_DIR}/bin"
+      cp bin/hev-socks5-tunnel "${DIST_DIR}/bin/"
+    )
+    rm -rf "${HEV_SRC_DIR}"
+    echo "    -> hev-socks5-tunnel 原生编译成功！"
+  else
+    echo "提示: 未检测到 gmake 或 git，跳过 hev-socks5-tunnel 原生源码编译"
+  fi
+fi
 
 # 2. 复制二进制与运行配置到 staging 目录
 if [ -f "${DIST_DIR}/bin/pf-aliasd" ]; then
@@ -105,11 +126,31 @@ fi
 [ -f "${DIST_DIR}/bin/mosdns-x" ] && cp "${DIST_DIR}/bin/mosdns-x" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/mosdns-controller" ] && cp "${DIST_DIR}/bin/mosdns-controller" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/sing-box" ] && cp "${DIST_DIR}/bin/sing-box" "${STAGE_DIR}/usr/local/bin/"
+[ -f "${DIST_DIR}/bin/hev-socks5-tunnel" ] && cp "${DIST_DIR}/bin/hev-socks5-tunnel" "${STAGE_DIR}/usr/local/bin/"
+[ -f "${DIST_DIR}/bin/hev-controller" ] && cp "${DIST_DIR}/bin/hev-controller" "${STAGE_DIR}/usr/local/bin/"
+
+if [ -f "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" ]; then
+  cp "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" "${STAGE_DIR}/usr/local/etc/rc.d/"
+elif [ -f "${DIST_DIR}/rc.d/hev_socks5_tunnel" ]; then
+  cp "${DIST_DIR}/rc.d/hev_socks5_tunnel" "${STAGE_DIR}/usr/local/etc/rc.d/"
+fi
+
+if [ -f "${WORKSPACE_DIR}/rc.d/hev_controller" ]; then
+  cp "${WORKSPACE_DIR}/rc.d/hev_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
+elif [ -f "${DIST_DIR}/rc.d/hev_controller" ]; then
+  cp "${DIST_DIR}/rc.d/hev_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
+fi
 
 if [ -f "${WORKSPACE_DIR}/config.example.yaml" ]; then
   cp "${WORKSPACE_DIR}/config.example.yaml" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
 elif [ -f "${DIST_DIR}/etc/mosdns.yaml.example" ]; then
   cp "${DIST_DIR}/etc/mosdns.yaml.example" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
+fi
+
+if [ -f "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" ]; then
+  cp "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel/config.yaml.sample"
+elif [ -f "${DIST_DIR}/etc/hev-socks5-tunnel.yaml.example" ]; then
+  cp "${DIST_DIR}/etc/hev-socks5-tunnel.yaml.example" "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel/config.yaml.sample"
 fi
 
 chmod +x "${STAGE_DIR}/usr/local/sbin/"* "${STAGE_DIR}/usr/local/bin/"* "${STAGE_DIR}/usr/local/etc/rc.d/"* 2>/dev/null || true
@@ -240,7 +281,34 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.6 Package: os-mosdns (OPNsense WebGUI 插件)
+# 3.6 Package: hev-socks5-tunnel (高性能 Tun2Socks 代理与 WebUI 管理器)
+# ------------------------------------------------------------------------------
+if [ -f "${STAGE_DIR}/usr/local/bin/hev-socks5-tunnel" ] || [ -f "${STAGE_DIR}/usr/local/bin/hev-controller" ]; then
+  echo "==> 打包 hev-socks5-tunnel (Tun2Socks + Controller)..."
+  cat << EOF > /tmp/manifest_hev
+name: hev-socks5-tunnel
+version: "2.13.0"
+origin: net/hev-socks5-tunnel
+comment: "High-performance Tun2Socks proxy bridge and Web UI manager"
+desc: "hev-socks5-tunnel compiled from source with coroutines and hev-controller WebUI"
+maintainer: "admin@opn-box.local"
+www: "${PROJECT_WEB_URL}"
+prefix: /usr/local
+categories: [net]
+arch: "FreeBSD:*:amd64"
+EOF
+  rm -f /tmp/plist_hev
+  [ -f "${STAGE_DIR}/usr/local/bin/hev-socks5-tunnel" ] && echo "bin/hev-socks5-tunnel" >> /tmp/plist_hev
+  [ -f "${STAGE_DIR}/usr/local/bin/hev-controller" ] && echo "bin/hev-controller" >> /tmp/plist_hev
+  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/hev_socks5_tunnel" ] && echo "etc/rc.d/hev_socks5_tunnel" >> /tmp/plist_hev
+  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/hev_controller" ] && echo "etc/rc.d/hev_controller" >> /tmp/plist_hev
+  [ -f "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel/config.yaml.sample" ] && echo "etc/hev-socks5-tunnel/config.yaml.sample" >> /tmp/plist_hev
+
+  pkg create -M /tmp/manifest_hev -p /tmp/plist_hev -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+fi
+
+# ------------------------------------------------------------------------------
+# 3.7 Package: os-mosdns (OPNsense WebGUI 插件)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-mosdns/src" ]; then
   echo "==> 打包 os-mosdns (OPNsense UI 插件)..."

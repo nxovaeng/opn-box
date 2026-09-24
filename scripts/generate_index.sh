@@ -121,6 +121,7 @@ cat << EOF > "${INDEX_FILE}"
         <span class="badge">100% 源码自编译</span>
         <span class="badge">零首包竞态</span>
         <span class="badge">Min-Heap TTL GC</span>
+        <span class="badge">hev-socks5-tunnel 极速 TUN</span>
       </div>
     </header>
 
@@ -133,8 +134,8 @@ fetch -o /usr/local/etc/pkg/repos/opnbox.conf ${BASE_URL}/opnbox.conf
 # 2. 更新软件源索引
 pkg update -r opnbox
 
-# 3. 安装 os-mosdns 插件及核心套件
-pkg install -y os-mosdns sing-box</code></pre>
+# 3. 安装 os-mosdns 插件及核心套件 (含 sing-box 与 hev-socks5-tunnel)
+pkg install -y os-mosdns sing-box hev-socks5-tunnel</code></pre>
     </div>
 
     <div class="card">
@@ -166,12 +167,17 @@ pkg install -y os-mosdns sing-box</code></pre>
           <tr>
             <td><strong>mosdns-controller</strong></td>
             <td><code>amd64</code></td>
-            <td>WebUI 规则管理面板与动态控制器（内嵌编译好的前端静态资源）</td>
+            <td>WebUI 规则管理面板与动态控制器 (端口 :5380)</td>
           </tr>
           <tr>
             <td><strong>sing-box</strong></td>
             <td><code>amd64</code></td>
             <td>集成 FreeBSD TUN 本地适配补丁的全功能代理内核</td>
+          </tr>
+          <tr>
+            <td><strong>hev-socks5-tunnel</strong></td>
+            <td><code>amd64</code></td>
+            <td>纯 C 协程极致性能 Tun2Socks 虚拟网卡代理，内嵌 hev-controller Web 管理面板 (端口 :5382)</td>
           </tr>
         </tbody>
       </table>

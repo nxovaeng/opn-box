@@ -1,0 +1,32 @@
+# ==============================================================================
+# hev-socks5-tunnel 官方标准配置 (适配 OPNsense + 本地 SOCKS5 / Xray xhttp 节点)
+# ==============================================================================
+
+tunnel:
+  # 虚拟网卡接口名称 (FreeBSD 原生 tun 接口)
+  name: tun0
+  # 数据包最大传输单元 (推荐 1500)
+  mtu: 1500
+  multi-queue: false
+  # 虚拟 TUN IPv4 地址 (作为策略路由出站网关)
+  ipv4: 198.18.0.1
+  # ipv6: 'fc00::1'
+
+socks5:
+  # 上游 SOCKS5 代理服务器地址 (指向本地 Xray / V2Ray xhttp 入站)
+  address: 127.0.0.1
+  # 上游 SOCKS5 代理端口 (与 Xray 中的 socks inbound 一致)
+  port: 10808
+  # UDP 转发模式: 'udp' (SOCKS5 原生 UDP 关联) 或 'tcp'
+  udp: 'udp'
+  # username: ''
+  # password: ''
+
+misc:
+  # 协程任务栈大小
+  task-stack-size: 86016
+  connect-timeout: 5000
+  read-write-timeout: 60000
+  # 日志文件路径与级别 (debug, info, warn, error)
+  log-file: /var/log/hev-socks5-tunnel.log
+  log-level: info

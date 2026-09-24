@@ -43,14 +43,21 @@ fi
 echo "=========================================================="
 
 # ------------------------------------------------------------------------------
-# 1. 编译本地 pf-aliasd 守护进程 (自研核心：/dev/pf 与 TTL 最小堆 GC)
+# 1. 编译本地 pf-aliasd 守护进程与 hev-controller (Web 管理面板)
 # ------------------------------------------------------------------------------
-echo "==> [1/5] 编译本地 pf-aliasd 守护进程..."
+echo "==> [1/6] 编译本地 pf-aliasd 守护进程..."
 (
     cd "${WORKSPACE_DIR}"
     go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/pf-aliasd" ./cmd/pf-aliasd
 )
 echo "    -> pf-aliasd 编译成功"
+
+echo "==> [2/6] 编译本地 hev-controller (Tun2Socks Web 管理面板)..."
+(
+    cd "${WORKSPACE_DIR}"
+    go build -trimpath -ldflags="-s -w" -o "${OUTPUT_DIR}/hev-controller" ./cmd/hev-controller
+)
+echo "    -> hev-controller 编译成功"
 
 # ------------------------------------------------------------------------------
 # 2. 从源码编译官方 mosdns (严格指定 v5.3.4，嵌入自研 pf_alias)
@@ -160,11 +167,14 @@ if [ "${BUILD_SINGBOX:-1}" = "1" ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 6. 同步配置文件模板与 rc.d 服务启动脚本至 dist/ 目录
+# 7. 同步配置文件模板与 rc.d 服务启动脚本至 dist/ 目录
 # ------------------------------------------------------------------------------
 mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc"
 [ -f "${WORKSPACE_DIR}/rc.d/pf_aliasd" ] && cp "${WORKSPACE_DIR}/rc.d/pf_aliasd" "${WORKSPACE_DIR}/dist/rc.d/"
+[ -f "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" ] && cp "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" "${WORKSPACE_DIR}/dist/rc.d/"
+[ -f "${WORKSPACE_DIR}/rc.d/hev_controller" ] && cp "${WORKSPACE_DIR}/rc.d/hev_controller" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/config.example.yaml" ] && cp "${WORKSPACE_DIR}/config.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns.yaml.example"
+[ -f "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" ] && cp "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" "${WORKSPACE_DIR}/dist/etc/hev-socks5-tunnel.yaml.example"
 
 echo "=========================================================="
 echo " 自编译完成！产物列表 (全量 FreeBSD 64位 ELF 二进制):"

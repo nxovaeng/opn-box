@@ -60,7 +60,7 @@ jobs:
           release: "14.2"
           usesh: true
           prepare: |
-            pkg install -y pkg
+            pkg install -y pkg git gmake
           run: |
             chmod +x scripts/package_repo.sh
             ./scripts/package_repo.sh \

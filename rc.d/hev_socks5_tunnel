@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# PROVIDE: hev_socks5_tunnel
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="hev_socks5_tunnel"
+rcvar="hev_socks5_tunnel_enable"
+
+load_rc_config $name
+
+: ${hev_socks5_tunnel_enable:="NO"}
+: ${hev_socks5_tunnel_config:="/usr/local/etc/hev-socks5-tunnel/config.yaml"}
+: ${hev_socks5_tunnel_pidfile:="/var/run/hev-socks5-tunnel.pid"}
+: ${hev_socks5_tunnel_logfile:="/var/log/hev-socks5-tunnel.log"}
+
+pidfile="${hev_socks5_tunnel_pidfile}"
+command="/usr/sbin/daemon"
+procname="/usr/local/bin/hev-socks5-tunnel"
+command_args="-p ${pidfile} -o ${hev_socks5_tunnel_logfile} -t ${name} ${procname} ${hev_socks5_tunnel_config}"
+
+start_precmd="hev_socks5_tunnel_prestart"
+
+hev_socks5_tunnel_prestart()
+{
+    if [ ! -f "${hev_socks5_tunnel_config}" ]; then
+        echo "Configuration file ${hev_socks5_tunnel_config} not found!"
+        return 1
+    fi
+    mkdir -p /var/log /var/run
+    touch "${hev_socks5_tunnel_logfile}"
+    # Ensure tun kernel module is loaded on FreeBSD
+    kldstat -q -m if_tun || kldload if_tun 2>/dev/null || true
+}
+
+run_rc_command "$1"

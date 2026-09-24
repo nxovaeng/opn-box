@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# PROVIDE: hev_controller
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="hev_controller"
+rcvar="hev_controller_enable"
+
+load_rc_config $name
+
+: ${hev_controller_enable:="NO"}
+: ${hev_controller_listen:=":5382"}
+: ${hev_controller_config:="/usr/local/etc/hev-socks5-tunnel/config.yaml"}
+: ${hev_controller_logfile:="/var/log/hev-controller.log"}
+: ${hev_controller_pidfile:="/var/run/hev-controller.pid"}
+
+pidfile="${hev_controller_pidfile}"
+command="/usr/sbin/daemon"
+procname="/usr/local/bin/hev-controller"
+command_args="-p ${pidfile} -o ${hev_controller_logfile} -t ${name} ${procname} -listen ${hev_controller_listen} -config ${hev_controller_config}"
+
+start_precmd="hev_controller_prestart"
+
+hev_controller_prestart()
+{
+    mkdir -p /var/log /var/run
+    touch "${hev_controller_logfile}"
+}
+
+run_rc_command "$1"

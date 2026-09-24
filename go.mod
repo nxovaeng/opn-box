@@ -1,6 +1,6 @@
 module opn-box
 
-go 1.27.1
+go 1.22
 
 require (
 	github.com/IrineSistiana/go-bytes-pool v0.0.0-20230918115058-c72bd9761c57 // indirect
