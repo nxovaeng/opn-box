@@ -149,3 +149,4 @@ echo " 规则库同步完成！"
 echo " MosDNS 规则: $(ls -1 ${RULE_DIR}/*.txt 2>/dev/null | tr '\n' ' ')"
 echo " Xray 规则:   $(ls -1 ${XRAY_DIR}/*.dat 2>/dev/null | tr '\n' ' ')"
 echo "=========================================================="
+
