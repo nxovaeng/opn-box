@@ -139,6 +139,13 @@ fi
 if [ -f "${DIST_DIR}/bin/pf-aliasd" ]; then
   cp "${DIST_DIR}/bin/pf-aliasd" "${STAGE_DIR}/usr/local/sbin/"
 fi
+if [ -f "${WORKSPACE_DIR}/scripts/update_rules.sh" ]; then
+  cp "${WORKSPACE_DIR}/scripts/update_rules.sh" "${STAGE_DIR}/usr/local/sbin/update-opnbox-rules.sh"
+elif [ -f "${DIST_DIR}/sbin/update-opnbox-rules.sh" ]; then
+  cp "${DIST_DIR}/sbin/update-opnbox-rules.sh" "${STAGE_DIR}/usr/local/sbin/update-opnbox-rules.sh"
+fi
+chmod +x "${STAGE_DIR}/usr/local/sbin/"* 2>/dev/null || true
+
 if [ -f "${WORKSPACE_DIR}/rc.d/pf_aliasd" ]; then
   cp "${WORKSPACE_DIR}/rc.d/pf_aliasd" "${STAGE_DIR}/usr/local/etc/rc.d/"
 elif [ -f "${DIST_DIR}/rc.d/pf_aliasd" ]; then
@@ -388,7 +395,15 @@ fi
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-mosdns/src" ]; then
   echo "==> 打包 os-mosdns (OPNsense UI 插件，自编: ${BUILD_DATE})..."
+  mkdir -p "${STAGE_UI_DIR}/usr/local/sbin"
   cp -r "${WORKSPACE_DIR}/src/os-mosdns/src/"* "${STAGE_UI_DIR}/usr/local/"
+  if [ -f "${WORKSPACE_DIR}/scripts/update_rules.sh" ]; then
+    cp "${WORKSPACE_DIR}/scripts/update_rules.sh" "${STAGE_UI_DIR}/usr/local/sbin/update-opnbox-rules.sh"
+  elif [ -f "${DIST_DIR}/sbin/update-opnbox-rules.sh" ]; then
+    cp "${DIST_DIR}/sbin/update-opnbox-rules.sh" "${STAGE_UI_DIR}/usr/local/sbin/update-opnbox-rules.sh"
+  fi
+  chmod +x "${STAGE_UI_DIR}/usr/local/sbin/"* 2>/dev/null || true
+
   cat << EOF > /tmp/manifest_os_mosdns
 name: os-mosdns
 version: "${BUILD_DATE}"
@@ -406,6 +421,7 @@ deps: {
 }
 EOF
   cat << EOF > /tmp/plist_os_mosdns
+sbin/update-opnbox-rules.sh
 opnsense/service/conf/actions.d/actions_mosdns.conf
 opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml
 EOF

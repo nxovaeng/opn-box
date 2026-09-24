@@ -1,11 +1,20 @@
-# MosDNS v5 Configuration Example with pf_alias Plugin
+# ==============================================================================
+# MosDNS v5 Configuration - OPN-Box 粗粒度智能分流与零竞态 PF 同步
+#
+# 分流逻辑：
+# 1. 明确国内域名与白名单 (cn.txt / custom-direct.txt) -> 国内 DNS 直连解析并返回 (不入代理表)
+# 2. 明确出海域名 (gfw.txt / custom-proxy.txt) 以及 未明确分类的境外/未知域名 ->
+#    全部走海外防污染 DoH (1.1.1.1 / 8.8.8.8) 并注入 PF Table <GFW_Proxy> 送往 TUN
+# 3. 后端 Xray-core 利用 7 层 SNI 嗅探与 geosite.dat 进行二次精细分流 (OpenAI/流媒体等)
+# ==============================================================================
+
 log:
   level: info
   file: ""
 
 plugins:
   # -------------------------------------------------------------
-  # 1. Upstream Forwarders
+  # 1. Upstream Forwarders (上下游 DNS 解析器)
   # -------------------------------------------------------------
   - tag: forward_remote
     type: forward
@@ -23,53 +32,66 @@ plugins:
         - addr: "119.29.29.29"
 
   # -------------------------------------------------------------
-  # 2. Domain Data Providers
+  # 2. Domain Data Providers (域名 Set 规则集合)
   # -------------------------------------------------------------
-  - tag: gfw_list
+  # 国内直连域名集合 (权威大库 + 用户自定义白名单)
+  - tag: direct_domain_set
+    type: domain_set
+    args:
+      files:
+        - "/usr/local/etc/mosdns/rule/cn.txt"
+        - "/usr/local/etc/mosdns/rule/custom-direct.txt"
+
+  # 出海代理域名集合 (防污染名单 + 用户自定义黑名单)
+  - tag: proxy_domain_set
     type: domain_set
     args:
       files:
         - "/usr/local/etc/mosdns/rule/gfw.txt"
+        - "/usr/local/etc/mosdns/rule/custom-proxy.txt"
 
   # -------------------------------------------------------------
-  # 3. pf_alias Plugin (OPNsense External Alias Integration)
+  # 3. pf_alias Plugin (OPNsense External Alias 动态同步插件)
   # -------------------------------------------------------------
   - tag: sync_to_pf
     type: pf_alias
     args:
       socket_path: "/var/run/pf-aliasd.sock"
-      table: "GFW_Proxy"          # OPNsense External Alias Name (table <GFW_Proxy> persist)
-      min_ttl: 60                 # Minimum clamp TTL in seconds
-      max_ttl: 86400              # Maximum clamp TTL (24h)
-      timeout: "100ms"            # Synchronous wait timeout (failsafe)
-      sync: true                  # Synchronous injection to avoid first-packet race condition
+      table: "GFW_Proxy"          # OPNsense External Alias 表名 (table <GFW_Proxy> persist)
+      min_ttl: 60                 # 最小 TTL 钳位 (秒)
+      max_ttl: 86400              # 最大 TTL 钳位 (24小时)
+      timeout: "100ms"            # 同步等待超时 (防挂起保护)
+      sync: true                  # 同步阻塞注入 (消除首包失步竞态)
 
   # -------------------------------------------------------------
-  # 4. Main Sequence Pipeline
+  # 4. Main Sequence Pipeline (主匹配流水线)
   # -------------------------------------------------------------
   - tag: main_sequence
     type: sequence
     args:
       exec:
-        # Match Proxy / GFW domains
+        # [步骤 1] 明确不走代理的国内域名：走国内 DNS 解析，直接返回 (不进 PF 代理表)
         - if:
-            - query_is_gfw_domain
+            - query_is_direct_domain
           exec:
-            - forward_remote      # Resolve via remote DoH
-            - sync_to_pf          # Extract IPs + TTL, synchronously push to pf-aliasd
+            - forward_local
             - _return
 
-        # Default fallback to domestic DNS
-        - forward_local
+        # [步骤 2] 明确走代理 (gfw/custom-proxy) 以及 未明确归类的境外/未知域名：
+        #         统一走海外防污染 DoH 解析，并同步将 IP 注入 PF Table <GFW_Proxy> 进入 TUN 网卡
+        - forward_remote
+        - sync_to_pf
+        - _return
 
-  - tag: query_is_gfw_domain
+  # 匹配国内直连集合子序列
+  - tag: query_is_direct_domain
     type: sequence
     args:
       exec:
-        - _matches_domain: gfw_list
+        - _matches_domain: direct_domain_set
 
   # -------------------------------------------------------------
-  # 5. DNS Server Listeners
+  # 5. DNS Server Listeners (本地监听)
   # -------------------------------------------------------------
   - tag: udp_server
     type: udp_server

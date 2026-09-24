@@ -32,3 +32,4 @@ xray_controller_prestart()
 }
 
 run_rc_command "$1"
+

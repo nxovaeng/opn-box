@@ -216,7 +216,8 @@ fi
 # ------------------------------------------------------------------------------
 # 8. 同步配置文件模板与 rc.d 服务启动脚本至 dist/ 目录
 # ------------------------------------------------------------------------------
-mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc"
+mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc" "${WORKSPACE_DIR}/dist/sbin"
+[ -f "${WORKSPACE_DIR}/scripts/update_rules.sh" ] && cp "${WORKSPACE_DIR}/scripts/update_rules.sh" "${WORKSPACE_DIR}/dist/sbin/update-opnbox-rules.sh" && chmod +x "${WORKSPACE_DIR}/dist/sbin/update-opnbox-rules.sh"
 [ -f "${WORKSPACE_DIR}/rc.d/pf_aliasd" ] && cp "${WORKSPACE_DIR}/rc.d/pf_aliasd" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" ] && cp "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_controller" ] && cp "${WORKSPACE_DIR}/rc.d/hev_controller" "${WORKSPACE_DIR}/dist/rc.d/"

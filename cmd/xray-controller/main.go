@@ -33,12 +33,12 @@ var (
 
 // AppData persists controller state (nodes, inbounds, rules, subscriptions)
 type AppData struct {
-	ActiveNodeTag string          `json:"active_node_tag"`
-	Subscriptions []Subscription  `json:"subscriptions"`
-	Nodes         []NodeConfig    `json:"nodes"`
-	Inbounds      []CustomInbound `json:"inbounds"`
-	Rules         []RoutingRule   `json:"rules"`
-	DomainStrategy string         `json:"domain_strategy"`
+	ActiveNodeTag  string          `json:"active_node_tag"`
+	Subscriptions  []Subscription  `json:"subscriptions"`
+	Nodes          []NodeConfig    `json:"nodes"`
+	Inbounds       []CustomInbound `json:"inbounds"`
+	Rules          []RoutingRule   `json:"rules"`
+	DomainStrategy string          `json:"domain_strategy"`
 }
 
 type Subscription struct {
@@ -56,7 +56,7 @@ type NodeConfig struct {
 	Protocol    string                 `json:"protocol"` // vless, vmess, trojan, shadowsocks
 	Address     string                 `json:"address"`
 	Port        int                    `json:"port"`
-	Network     string                 `json:"network"` // tcp, ws, xhttp, grpc
+	Network     string                 `json:"network"`  // tcp, ws, xhttp, grpc
 	Security    string                 `json:"security"` // none, tls, reality
 	SNI         string                 `json:"sni,omitempty"`
 	Path        string                 `json:"path,omitempty"`
@@ -145,10 +145,10 @@ func loadData() (*AppData, error) {
 	if err != nil {
 		// Provide default initialized app state
 		return &AppData{
-			ActiveNodeTag: "",
+			ActiveNodeTag:  "",
 			DomainStrategy: "AsIs",
-			Subscriptions: []Subscription{},
-			Nodes:         []NodeConfig{},
+			Subscriptions:  []Subscription{},
+			Nodes:          []NodeConfig{},
 			Inbounds: []CustomInbound{
 				{
 					ID:       "in-lan-mixed",
