@@ -190,3 +190,4 @@ plugins:
 - [ ] 将 `rc.d/mosdns` 与 `config.yaml.sample` 加入 `mosdns` 包 plist。
 - [ ] 将 `rc.d/mosdns_controller` 与 `controller.yaml.sample` 加入 `mosdns-controller` 包 plist。
 - [ ] 确保目标架构严格为 `FreeBSD:15:amd64`。
+
