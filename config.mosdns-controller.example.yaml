@@ -1,0 +1,24 @@
+# ==============================================================================
+# MosDNS Controller 默认配置文件样例
+# 安装位置建议: /usr/local/etc/mosdns/controller.yaml
+# ==============================================================================
+
+server:
+  # Web UI 访问监听地址与端口
+  public_listen: "0.0.0.0:5380"
+  # 内部审计日志接收端监听地址与端口 (接收 mosdns query_audit 推送)
+  internal_listen: "127.0.0.1:5381"
+
+storage:
+  # SQLite 数据与日志持久化路径
+  path: "/var/db/mosdns-controller/controller.db"
+
+mosdns:
+  # MosDNS API 插件通信接口
+  base_url: "http://127.0.0.1:9091"
+  # Controller 与 MosDNS 共享认证令牌文件 (32 字节随机 hex)
+  token_file: "/usr/local/etc/mosdns/controller.token"
+
+web:
+  # Web 登录会话过期时间
+  session_ttl: "24h"

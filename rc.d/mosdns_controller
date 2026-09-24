@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# PROVIDE: mosdns_controller
+# REQUIRE: mosdns
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="mosdns_controller"
+rcvar="mosdns_controller_enable"
+
+load_rc_config $name
+
+: ${mosdns_controller_enable:="NO"}
+: ${mosdns_controller_config:="/usr/local/etc/mosdns/controller.yaml"}
+: ${mosdns_controller_logfile:="/var/log/mosdns-controller.log"}
+: ${mosdns_controller_pidfile:="/var/run/mosdns-controller.pid"}
+
+pidfile="${mosdns_controller_pidfile}"
+command="/usr/sbin/daemon"
+procname="/usr/local/bin/mosdns-controller"
+command_args="-p ${pidfile} -o ${mosdns_controller_logfile} -t ${name} ${procname} -config ${mosdns_controller_config}"
+
+start_precmd="mosdns_controller_prestart"
+
+mosdns_controller_prestart()
+{
+    mkdir -p /var/log /var/run /var/db/mosdns-controller /usr/local/etc/mosdns
+    touch "${mosdns_controller_logfile}"
+    # Automatically generate 32-byte auth token if missing
+    if [ ! -f "/usr/local/etc/mosdns/controller.token" ]; then
+        if command -v openssl >/dev/null 2>&1; then
+            openssl rand -hex 32 > /usr/local/etc/mosdns/controller.token
+            chmod 600 /usr/local/etc/mosdns/controller.token
+        fi
+    fi
+}
+
+run_rc_command "$1"

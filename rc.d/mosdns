@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# PROVIDE: mosdns
+# REQUIRE: pf_aliasd
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="mosdns"
+rcvar="mosdns_enable"
+
+load_rc_config $name
+
+: ${mosdns_enable:="NO"}
+: ${mosdns_config:="/usr/local/etc/mosdns/config.yaml"}
+: ${mosdns_dir:="/usr/local/etc/mosdns"}
+: ${mosdns_logfile:="/var/log/mosdns.log"}
+: ${mosdns_pidfile:="/var/run/mosdns.pid"}
+
+pidfile="${mosdns_pidfile}"
+command="/usr/sbin/daemon"
+procname="/usr/local/bin/mosdns"
+command_args="-p ${pidfile} -o ${mosdns_logfile} -t ${name} ${procname} start -c ${mosdns_config} -d ${mosdns_dir}"
+
+start_precmd="mosdns_prestart"
+
+mosdns_prestart()
+{
+    if [ ! -f "${mosdns_config}" ]; then
+        echo "Configuration file ${mosdns_config} not found!"
+        return 1
+    fi
+    mkdir -p /var/log /var/run "${mosdns_dir}"
+    touch "${mosdns_logfile}"
+}
+
+run_rc_command "$1"

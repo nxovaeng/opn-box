@@ -137,42 +137,25 @@ plugins:
 
 | 组件 / 模块 | 现状 | 缺陷 / 缺失诊断 | 改造方案 |
 | :--- | :--- | :--- | :--- |
-| **`rc.d/mosdns`** | ❌ 缺失 | 仓库中没有 `mosdns` 的 FreeBSD 服务启动脚本，导致 `actions_mosdns.conf` 调用失败。 | 编写标准 `rc.d/mosdns`，使用 `daemon` 托管，支持配置文件检查与 pidfile。 |
-| **`rc.d/mosdns_controller`** | ❌ 缺失 | 仓库中没有 `mosdns-controller` 的启动脚本，无法开机自启和作为后台守护进程常驻。 | 编写标准 `rc.d/mosdns_controller`，托管后台运行、日志输出与 pid 管理。 |
-| **`actions_mosdns.conf`** | ⚠️ 不完整 | 仅配置了 `mosdns` 与 `pf_aliasd`，未纳入 `mosdns-controller`。 | 增加 `controller.start/stop/restart/status` 及联合启停配置。 |
-| **配置文件样例** | ⚠️ 缺失 | 缺少 `config.mosdns-controller.example.yaml`。 | 新增样例，定义 Web 端口 `:5380`、内部端口 `:5381`、存储路径与 Token 文件路径。 |
-| **目录规范与 Token** | ⚠️ 待定义 | FreeBSD 规范存储路径与共享通信 Token 未初始化。 | 规划 `/var/db/mosdns-controller/`、自动生成 32 字节 hex Token `/usr/local/etc/mosdns/controller.token`。 |
-| **`build_binaries.sh`** | ⚠️ 需升级 | 目前 `mosdns` 从 `IrineSistiana/mosdns` 官方拉取，缺少 Controller 插件。 | 改为从 `luoye663/mosdns`（`managed-dns` 分支）拉取并注入 `pkg/plugin/`（`pf_alias`），编译双合一内核。 |
-| **`package_repo.sh`** | ⚠️ 需补齐 | 打包 `mosdns` 与 `mosdns-controller` 时未收录 rc 脚本和新配置文件。 | 在 plist 和 stage 中补全 `rc.d/mosdns`、`rc.d/mosdns_controller` 及配置文件。 |
+| **`rc.d/mosdns`** | ✅ 已就绪 | 编写了标准的 FreeBSD 服务启动脚本，使用 `daemon` 托管，支持配置文件预检与 pidfile。 | 位于 `rc.d/mosdns`，提供优雅启停与日志输出。 |
+| **`rc.d/mosdns_controller`** | ✅ 已就绪 | 编写了标准 `rc.d/mosdns_controller` 脚本，支持自动生成 32 字节 Token。 | 位于 `rc.d/mosdns_controller`，开机自启常驻。 |
+| **`actions_mosdns.conf`** | ✅ 已模块化 | 彻底解耦，仅专注 `mosdns`、`pf_aliasd` 与 `mosdns-controller`。 | `tun2socks` 拆分至 `actions_tun2socks.conf`，`xray` 拆分至 `actions_xray.conf`，全局管理归入 `actions_netbox.conf`。 |
+| **配置文件样例** | ✅ 已提供 | 已补充 `config.mosdns-controller.example.yaml`。 | 定义 Web 端口 `:5380`、内部端口 `:5381`、存储路径与 Token 文件路径。 |
+| **目录规范与 Token** | ✅ 已就绪 | 初始化规范目录 `/var/db/mosdns-controller/`、Token 自动生成逻辑已置入 rc.d 预检函数。 | 自动创建 `/usr/local/etc/mosdns/controller.token`。 |
+| **`build_binaries.sh`** | ⚠️ 待编译 | 目前 `mosdns` 需从 `luoye663/mosdns`（`managed-dns` 分支）拉取并注入 `pf_alias` 编译双合一内核。 | 编译双合一内核并产出 `/dist/bin/mosdns` 与 `/dist/bin/mosdns-controller`。 |
+| **`package_repo.sh`** | ✅ 已升级 | 已补齐新 rc 脚本、配置文件样例，并支持 `os-mosdns`, `os-tun2socks`, `os-xray`, `os-netbox` 模块化打包。 | 自动打包全套 FreeBSD 15 pkg 并生成软件源索引。 |
 
 ---
 
 ## 四、后续落地开发任务清单 (Roadmap)
 
 ### Task 1: 编写 `rc.d/mosdns` 与 `rc.d/mosdns_controller`
-- [ ] 创建 `rc.d/mosdns`：
-  - 变量：`mosdns_enable="NO"`, `mosdns_config="/usr/local/etc/mosdns/config.yaml"`, `mosdns_pidfile="/var/run/mosdns.pid"`, `mosdns_logfile="/var/log/mosdns.log"`
-  - 命令：`/usr/sbin/daemon -p ${mosdns_pidfile} -o ${mosdns_logfile} -t mosdns /usr/local/bin/mosdns start -c ${mosdns_config} -d /usr/local/etc/mosdns`
-- [ ] 创建 `rc.d/mosdns_controller`：
-  - 变量：`mosdns_controller_enable="NO"`, `mosdns_controller_config="/usr/local/etc/mosdns/controller.yaml"`, `mosdns_controller_pidfile="/var/run/mosdns-controller.pid"`
-  - 命令：`/usr/sbin/daemon -p ${mosdns_controller_pidfile} -o /var/log/mosdns-controller.log -t mosdns_controller /usr/local/bin/mosdns-controller -config ${mosdns_controller_config}`
+- [x] 创建 `rc.d/mosdns`
+- [x] 创建 `rc.d/mosdns_controller` (内置 Token 自动生成与目录创建)
 
 ### Task 2: 提供配置文件样例与 Token 初始化
-- [ ] 创建 `config.mosdns-controller.example.yaml`：
-  ```yaml
-  server:
-    public_listen: "0.0.0.0:5380"
-    internal_listen: "127.0.0.1:5381"
-  storage:
-    path: "/var/db/mosdns-controller/controller.db"
-  mosdns:
-    base_url: "http://127.0.0.1:9091"
-    token_file: "/usr/local/etc/mosdns/controller.token"
-  web:
-    session_ttl: "24h"
-  ```
-- [ ] 在 `rc.d/mosdns_controller` 的 `precmd` 或 OPNsense 初始动作中加入 Token 自动生成逻辑：
-  `[ ! -f /usr/local/etc/mosdns/controller.token ] && openssl rand -hex 32 > /usr/local/etc/mosdns/controller.token`。
+- [x] 创建 `config.mosdns-controller.example.yaml`
+- [x] 在 `rc.d/mosdns_controller` 的 `start_precmd` 中加入 Token 自动生成逻辑
 
 ### Task 3: 改造 `scripts/build_binaries.sh`（编译双合一增强内核）
 - [ ] 将 MosDNS 源码拉取源切换为 `https://github.com/luoye663/mosdns.git`（分支 `managed-dns`）。
@@ -181,13 +164,16 @@ plugins:
 - [ ] 交叉编译 FreeBSD amd64 静态二进制 `/dist/bin/mosdns`。
 - [ ] 编译 `mosdns-controller`（内嵌已打包好的 WebUI 前端资源）。
 
-### Task 4: 更新 OPNsense 插件动作 (`actions_mosdns.conf`)
-- [ ] 扩展动作，支持独立管理与联合管理：
-  - `start` / `stop` / `restart` / `status`：联动 `mosdns`、`pf_aliasd` 与 `mosdns_controller`。
-  - `controller.start` / `controller.stop` / `controller.restart` / `controller.status`：专门管理 Controller 面板。
+### Task 4: 模块化重构 OPNsense 插件动作 (`actions_*.conf`) 与菜单
+- [x] 瘦身 `actions_mosdns.conf`：只负责 `mosdns`, `pf_aliasd`, `mosdns_controller` 联合及单组件启停。
+- [x] 创建 `src/os-tun2socks` 及其 `actions_tun2socks.conf` 与 `Menu.xml`。
+- [x] 创建 `src/os-xray` 及其 `actions_xray.conf` 与 `Menu.xml`。
+- [x] 创建 `src/os-netbox` 总套件及其 `actions_netbox.conf`（支持 `rules.update` 与全局联动）。
+- [x] 统一收拢为 `Services -> NetBox` 二级菜单下的树状结构。
 
 ### Task 5: 更新打包发布脚本 (`scripts/package_repo.sh`)
-- [ ] 将 `rc.d/mosdns` 与 `config.yaml.sample` 加入 `mosdns` 包 plist。
-- [ ] 将 `rc.d/mosdns_controller` 与 `controller.yaml.sample` 加入 `mosdns-controller` 包 plist。
-- [ ] 确保目标架构严格为 `FreeBSD:15:amd64`。
+- [x] 将 `rc.d/mosdns` 与 `config.yaml.sample` 加入 `mosdns` 包 plist。
+- [x] 将 `rc.d/mosdns_controller` 与 `controller.yaml.sample` 加入 `mosdns-controller` 包 plist。
+- [x] 增加 `os-tun2socks`、`os-xray`、`os-netbox` 独立软件包构建支持。
+- [x] 确保目标架构严格为 `FreeBSD:15:amd64`。
 

@@ -152,6 +152,18 @@ elif [ -f "${DIST_DIR}/rc.d/pf_aliasd" ]; then
   cp "${DIST_DIR}/rc.d/pf_aliasd" "${STAGE_DIR}/usr/local/etc/rc.d/"
 fi
 
+if [ -f "${WORKSPACE_DIR}/rc.d/mosdns" ]; then
+  cp "${WORKSPACE_DIR}/rc.d/mosdns" "${STAGE_DIR}/usr/local/etc/rc.d/"
+elif [ -f "${DIST_DIR}/rc.d/mosdns" ]; then
+  cp "${DIST_DIR}/rc.d/mosdns" "${STAGE_DIR}/usr/local/etc/rc.d/"
+fi
+
+if [ -f "${WORKSPACE_DIR}/rc.d/mosdns_controller" ]; then
+  cp "${WORKSPACE_DIR}/rc.d/mosdns_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
+elif [ -f "${DIST_DIR}/rc.d/mosdns_controller" ]; then
+  cp "${DIST_DIR}/rc.d/mosdns_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
+fi
+
 [ -f "${DIST_DIR}/bin/mosdns" ] && cp "${DIST_DIR}/bin/mosdns" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/mosdns-x" ] && cp "${DIST_DIR}/bin/mosdns-x" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/mosdns-controller" ] && cp "${DIST_DIR}/bin/mosdns-controller" "${STAGE_DIR}/usr/local/bin/"
@@ -193,6 +205,10 @@ if [ -f "${WORKSPACE_DIR}/config.example.yaml" ]; then
   cp "${WORKSPACE_DIR}/config.example.yaml" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
 elif [ -f "${DIST_DIR}/etc/mosdns.yaml.example" ]; then
   cp "${DIST_DIR}/etc/mosdns.yaml.example" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
+fi
+
+if [ -f "${WORKSPACE_DIR}/config.mosdns-controller.example.yaml" ]; then
+  cp "${WORKSPACE_DIR}/config.mosdns-controller.example.yaml" "${STAGE_DIR}/usr/local/etc/mosdns/controller.yaml.sample"
 fi
 
 if [ -f "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" ]; then
@@ -260,6 +276,7 @@ EOF
 bin/mosdns
 etc/mosdns/config.yaml.sample
 EOF
+  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/mosdns" ] && echo "etc/rc.d/mosdns" >> /tmp/plist_mosdns
   pkg create -M /tmp/manifest_mosdns -p /tmp/plist_mosdns -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
@@ -312,6 +329,8 @@ EOF
   cat << EOF > /tmp/plist_controller
 bin/mosdns-controller
 EOF
+  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/mosdns_controller" ] && echo "etc/rc.d/mosdns_controller" >> /tmp/plist_controller
+  [ -f "${STAGE_DIR}/usr/local/etc/mosdns/controller.yaml.sample" ] && echo "etc/mosdns/controller.yaml.sample" >> /tmp/plist_controller
   pkg create -M /tmp/manifest_controller -p /tmp/plist_controller -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
@@ -398,18 +417,12 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.8 Package: os-mosdns (OPNsense WebGUI 插件，自编译)
+# 3.8 Package: os-mosdns (OPNsense WebGUI 插件 - DNS 动态分流与守护)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-mosdns/src" ]; then
   echo "==> 打包 os-mosdns (OPNsense UI 插件，自编: ${BUILD_DATE})..."
-  mkdir -p "${STAGE_UI_DIR}/usr/local/sbin"
+  rm -rf "${STAGE_UI_DIR}" && mkdir -p "${STAGE_UI_DIR}/usr/local"
   cp -r "${WORKSPACE_DIR}/src/os-mosdns/src/"* "${STAGE_UI_DIR}/usr/local/"
-  if [ -f "${WORKSPACE_DIR}/scripts/update_rules.sh" ]; then
-    cp "${WORKSPACE_DIR}/scripts/update_rules.sh" "${STAGE_UI_DIR}/usr/local/sbin/update-opnbox-rules.sh"
-  elif [ -f "${DIST_DIR}/sbin/update-opnbox-rules.sh" ]; then
-    cp "${DIST_DIR}/sbin/update-opnbox-rules.sh" "${STAGE_UI_DIR}/usr/local/sbin/update-opnbox-rules.sh"
-  fi
-  chmod +x "${STAGE_UI_DIR}/usr/local/sbin/"* 2>/dev/null || true
 
   cat << EOF > /tmp/manifest_os_mosdns
 name: os-mosdns
@@ -425,15 +438,117 @@ abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
   pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" },
-  mosdns: { version: "5.3.4", origin: "dns/mosdns" }
+  mosdns: { version: "5.3.4", origin: "dns/mosdns" },
+  mosdns-controller: { version: "${BUILD_DATE}", origin: "dns/mosdns-controller" }
 }
 EOF
   cat << EOF > /tmp/plist_os_mosdns
-sbin/update-opnbox-rules.sh
 opnsense/service/conf/actions.d/actions_mosdns.conf
 opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml
 EOF
   pkg create -M /tmp/manifest_os_mosdns -p /tmp/plist_os_mosdns -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
+fi
+
+# ------------------------------------------------------------------------------
+# 3.9 Package: os-tun2socks (OPNsense WebGUI 插件 - 虚拟网卡与隧道桥接)
+# ------------------------------------------------------------------------------
+if [ -d "${WORKSPACE_DIR}/src/os-tun2socks/src" ]; then
+  echo "==> 打包 os-tun2socks (OPNsense UI 插件，自编: ${BUILD_DATE})..."
+  rm -rf "${STAGE_UI_DIR}" && mkdir -p "${STAGE_UI_DIR}/usr/local"
+  cp -r "${WORKSPACE_DIR}/src/os-tun2socks/src/"* "${STAGE_UI_DIR}/usr/local/"
+
+  cat << EOF > /tmp/manifest_os_tun2socks
+name: os-tun2socks
+version: "${BUILD_DATE}"
+origin: opnsense/os-tun2socks
+comment: "Tun2Socks High-Performance Bridge with Web UI Manager"
+desc: "OPNsense WebGUI plugin for hev-socks5-tunnel Tun2Socks bridge"
+maintainer: "admin@opn-box.local"
+www: "${PROJECT_WEB_URL}"
+prefix: /usr/local
+categories: [opnsense]
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
+deps: {
+  hev-socks5-tunnel: { version: "${HEV_TUNNEL_VERSION}", origin: "net/hev-socks5-tunnel" }
+}
+EOF
+  cat << EOF > /tmp/plist_os_tun2socks
+opnsense/service/conf/actions.d/actions_tun2socks.conf
+opnsense/mvc/app/models/OPNsense/Tun2socks/Menu/Menu.xml
+EOF
+  pkg create -M /tmp/manifest_os_tun2socks -p /tmp/plist_os_tun2socks -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
+fi
+
+# ------------------------------------------------------------------------------
+# 3.10 Package: os-xray (OPNsense WebGUI 插件 - 7层嗅探与出海路由)
+# ------------------------------------------------------------------------------
+if [ -d "${WORKSPACE_DIR}/src/os-xray/src" ]; then
+  echo "==> 打包 os-xray (OPNsense UI 插件，自编: ${BUILD_DATE})..."
+  rm -rf "${STAGE_UI_DIR}" && mkdir -p "${STAGE_UI_DIR}/usr/local"
+  cp -r "${WORKSPACE_DIR}/src/os-xray/src/"* "${STAGE_UI_DIR}/usr/local/"
+
+  cat << EOF > /tmp/manifest_os_xray
+name: os-xray
+version: "${BUILD_DATE}"
+origin: opnsense/os-xray
+comment: "Xray-core 7-layer Sniffing & Routing Engine with Web UI Manager"
+desc: "OPNsense WebGUI plugin for Xray-core proxy engine"
+maintainer: "admin@opn-box.local"
+www: "${PROJECT_WEB_URL}"
+prefix: /usr/local
+categories: [opnsense]
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
+deps: {
+  xray-core: { version: "${XRAY_VERSION}", origin: "security/xray-core" }
+}
+EOF
+  cat << EOF > /tmp/plist_os_xray
+opnsense/service/conf/actions.d/actions_xray.conf
+opnsense/mvc/app/models/OPNsense/Xray/Menu/Menu.xml
+EOF
+  pkg create -M /tmp/manifest_os_xray -p /tmp/plist_os_xray -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
+fi
+
+# ------------------------------------------------------------------------------
+# 3.11 Package: os-netbox (OPNsense WebGUI 插件 - 全局分流总套件与规则同步)
+# ------------------------------------------------------------------------------
+if [ -d "${WORKSPACE_DIR}/src/os-netbox/src" ]; then
+  echo "==> 打包 os-netbox (OPNsense UI 套件，自编: ${BUILD_DATE})..."
+  rm -rf "${STAGE_UI_DIR}" && mkdir -p "${STAGE_UI_DIR}/usr/local/sbin"
+  cp -r "${WORKSPACE_DIR}/src/os-netbox/src/"* "${STAGE_UI_DIR}/usr/local/"
+  if [ -f "${WORKSPACE_DIR}/scripts/update_rules.sh" ]; then
+    cp "${WORKSPACE_DIR}/scripts/update_rules.sh" "${STAGE_UI_DIR}/usr/local/sbin/update-opnbox-rules.sh"
+  elif [ -f "${DIST_DIR}/sbin/update-opnbox-rules.sh" ]; then
+    cp "${DIST_DIR}/sbin/update-opnbox-rules.sh" "${STAGE_UI_DIR}/usr/local/sbin/update-opnbox-rules.sh"
+  fi
+  chmod +x "${STAGE_UI_DIR}/usr/local/sbin/"* 2>/dev/null || true
+
+  cat << EOF > /tmp/manifest_os_netbox
+name: os-netbox
+version: "${BUILD_DATE}"
+origin: opnsense/os-netbox
+comment: "NetBox Suite - Unified Policy Routing & Dynamic Split Tunneling"
+desc: "OPNsense Meta WebGUI suite plugin for NetBox / Split-Tunnel"
+maintainer: "admin@opn-box.local"
+www: "${PROJECT_WEB_URL}"
+prefix: /usr/local
+categories: [opnsense]
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
+deps: {
+  os-mosdns: { version: "${BUILD_DATE}", origin: "opnsense/os-mosdns" },
+  os-tun2socks: { version: "${BUILD_DATE}", origin: "opnsense/os-tun2socks" },
+  os-xray: { version: "${BUILD_DATE}", origin: "opnsense/os-xray" }
+}
+EOF
+  cat << EOF > /tmp/plist_os_netbox
+sbin/update-opnbox-rules.sh
+opnsense/service/conf/actions.d/actions_netbox.conf
+opnsense/mvc/app/models/OPNsense/Netbox/Menu/Menu.xml
+EOF
+  pkg create -M /tmp/manifest_os_netbox -p /tmp/plist_os_netbox -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------

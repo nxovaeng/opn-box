@@ -25,80 +25,100 @@
 
 ## 二、OPNsense 原生 MVC 菜单整合
 
-通过 OPNsense 原生插件 `os-mosdns`（源码位于 [src/os-mosdns/src/](file:///home/yaofen/opn-box/src/os-mosdns/src/)），所有组件被统合至 OPNsense 侧边栏的 **`Services` -> `OPN-Box`** 菜单组下：
+为了保证系统的极度解耦与自由组合能力，OPN-Box 将 UI 拆分为高度独立的模块化插件（`os-mosdns`, `os-tun2socks`, `os-xray` 及总控套件 `os-netbox`）。各插件通过 OPNsense MVC Menu 的自动树节点合并机制，统一汇聚至侧边栏 **`Services` -> `NetBox`** 二级菜单下：
 
 ```xml
-<!-- src/os-mosdns/src/opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml -->
+<!-- 各模块解耦挂载示例 -->
+<!-- 1. os-mosdns (src/os-mosdns/src/opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml) -->
 <menu>
     <Services>
-        <OPNBox VisibleName="OPN-Box" cssClass="fa fa-cubes fa-fw">
-            <General VisibleName="MosDNS Settings" url="/ui/mosdns/general" Order="10"/>
-            <Dashboard VisibleName="MosDNS Controller" url="http://{SERVER_ADDR}:5380" target="_blank" Order="20"/>
-            <Tun2Socks VisibleName="Tun2Socks Manager" url="http://{SERVER_ADDR}:5382" target="_blank" Order="30"/>
-            <Xray VisibleName="Xray Manager" url="http://{SERVER_ADDR}:5384" target="_blank" Order="35"/>
-            <Log VisibleName="MosDNS Log" url="/ui/diagnostics/log/core/mosdns" Order="40"/>
-        </OPNBox>
+        <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
+            <MosDNS VisibleName="MosDNS" Order="10">
+                <Dashboard VisibleName="MosDNS Controller" url="http://{SERVER_ADDR}:5380" target="_blank" Order="10"/>
+                <General VisibleName="MosDNS Settings" url="/ui/mosdns/general" Order="20"/>
+                <Log VisibleName="MosDNS Log" url="/ui/diagnostics/log/core/mosdns" Order="30"/>
+            </MosDNS>
+        </NetBox>
+    </Services>
+</menu>
+
+<!-- 2. os-tun2socks (src/os-tun2socks/src/opnsense/mvc/app/models/OPNsense/Tun2socks/Menu/Menu.xml) -->
+<menu>
+    <Services>
+        <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
+            <Tun2Socks VisibleName="Tun2Socks" Order="20">
+                <Dashboard VisibleName="Tun2Socks Manager" url="http://{SERVER_ADDR}:5382" target="_blank" Order="10"/>
+            </Tun2Socks>
+        </NetBox>
+    </Services>
+</menu>
+
+<!-- 3. os-xray (src/os-xray/src/opnsense/mvc/app/models/OPNsense/Xray/Menu/Menu.xml) -->
+<menu>
+    <Services>
+        <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
+            <Xray VisibleName="Xray" Order="30">
+                <Dashboard VisibleName="Xray Manager" url="http://{SERVER_ADDR}:5384" target="_blank" Order="10"/>
+            </Xray>
+        </NetBox>
     </Services>
 </menu>
 ```
 
 - **`{SERVER_ADDR}` 动态解析**：OPNsense 前端模板会自动将 `{SERVER_ADDR}` 替换为当前管理员正在访问的路由 LAN IP 或域名，点击直接新标签页打开对应微服务面板，体验高度无缝。
+- **即插即用动态合并**：管理员仅安装需要的插件即可。例如只装 `os-mosdns` 时，`NetBox` 菜单下仅显示 MosDNS 相关组件；组合安装后自动拼装成完整的分流面板。
 
 ---
 
-## 三、OPNsense Configd 服务系统接入
+## 三、OPNsense Configd 模块化服务动作接入
 
-OPNsense 采用 `configd` 守护进程解耦 Web 界面与底层系统命令。OPN-Box 在 [actions_mosdns.conf](file:///home/yaofen/opn-box/src/os-mosdns/src/opnsense/service/conf/actions.d/actions_mosdns.conf) 中完整注册了各项标准动作：
+OPNsense 采用 `configd` 守护进程解耦 Web 界面与底层系统命令。OPN-Box 将动作按子系统职责彻底模块化，分别独立注册在各自插件的 `actions_<name>.conf` 中：
 
-```ini
-# MosDNS 与 pf-aliasd 核心管理
-[start]
-command:/usr/local/etc/rc.d/mosdns start && /usr/local/etc/rc.d/pf_aliasd start
-parameters:
-type:script
-message:starting MosDNS and pf-aliasd services
+### 1. `os-mosdns` 动作规范 (`actions_mosdns.conf`)
+负责 MosDNS 核心、`pf-aliasd` 零首包入表守护与 MosDNS Controller WebUI：
+```bash
+configctl mosdns start              # 联合启动 pf-aliasd, mosdns, controller
+configctl mosdns stop               # 联合停止
+configctl mosdns restart            # 联合重启
+configctl mosdns status             # 检查运行状态
 
-[stop]
-command:/usr/local/etc/rc.d/mosdns stop && /usr/local/etc/rc.d/pf_aliasd stop
-parameters:
-type:script
-message:stopping MosDNS and pf-aliasd services
-
-# Tun2Socks (hev-socks5-tunnel + hev-controller) 管理
-[tun2socks.start]
-command:/usr/local/etc/rc.d/hev_socks5_tunnel start && /usr/local/etc/rc.d/hev_controller start
-parameters:
-type:script
-message:starting hev-socks5-tunnel and controller
-
-# Xray (xray-core + xray-controller) 管理
-[xray.start]
-command:/usr/local/etc/rc.d/xray start && /usr/local/etc/rc.d/xray_controller start
-parameters:
-type:script
-message:starting xray-core and xray-controller
-
-# 规则库一键同步与更新 (支持定时任务挂载)
-[rules.update]
-command:/usr/local/sbin/update-opnbox-rules.sh
-parameters:
-type:script_output
-message:updating MosDNS and Xray rule databases
-
-[rules.update_mirror]
-command:/usr/local/sbin/update-opnbox-rules.sh --mirror
-parameters:
-type:script_output
-message:updating MosDNS and Xray rule databases via acceleration mirror
+# 细粒度单组件控制:
+configctl mosdns dns.status         # 检查 MosDNS 转发引擎
+configctl mosdns pf_aliasd.status   # 检查 pf-aliasd 守护进程
+configctl mosdns controller.status  # 检查 Controller WebUI
 ```
 
-### 控制台直接调用（CLI）
-管理员登录 SSH 或控制台后，可随时通过原生 `configctl` 发起调试：
+### 2. `os-tun2socks` 动作规范 (`actions_tun2socks.conf`)
+负责 `hev-socks5-tunnel` 虚拟网卡桥接与 Tun2Socks Web 面板：
 ```bash
-configctl mosdns status             # 检查 MosDNS 与 pf-aliasd 运行状态
-configctl mosdns tun2socks.status   # 检查 Tun2Socks 隧道状态
-configctl mosdns xray.restart       # 重启 Xray 与管理面板
-configctl mosdns rules.update       # 触发全套规则库自动同步
+configctl tun2socks start           # 联合启动 tunnel 与 controller
+configctl tun2socks stop            # 联合停止
+configctl tun2socks restart         # 联合重启
+configctl tun2socks status          # 检查运行状态
+configctl tun2socks tunnel.status   # 检查底层 tun0 协程服务
+configctl tun2socks controller.status # 检查 Tun2Socks 管理面板
+```
+
+### 3. `os-xray` 动作规范 (`actions_xray.conf`)
+负责 `xray-core` 7层应用特征路由与 Xray Manager 控制器：
+```bash
+configctl xray start                # 联合启动 xray 与 controller
+configctl xray stop                 # 联合停止
+configctl xray restart              # 联合重启
+configctl xray status               # 检查运行状态
+configctl xray core.status          # 检查 Xray 内核状态
+configctl xray controller.status    # 检查 Xray 管理面板
+```
+
+### 4. `os-netbox` 套件总控动作规范 (`actions_netbox.conf`)
+负责全套件统一联动与规则库集中同步：
+```bash
+configctl netbox start              # 一键顺序启动全链路微服务矩阵
+configctl netbox stop               # 一键优雅关闭全部服务
+configctl netbox restart            # 一键重启全套服务
+configctl netbox status             # 一键巡检全链路健康状态
+configctl netbox rules.update       # 触发全套规则库自动同步 (MosDNS + Xray)
+configctl netbox rules.update_mirror # 通过加速镜像触发规则库同步
 ```
 
 ---

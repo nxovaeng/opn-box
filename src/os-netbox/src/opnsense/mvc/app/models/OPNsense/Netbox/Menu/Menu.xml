@@ -1,0 +1,7 @@
+<menu>
+    <Services>
+        <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
+            <!-- NetBox 全局二级菜单根节点定义 -->
+        </NetBox>
+    </Services>
+</menu>

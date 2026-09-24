@@ -1,0 +1,9 @@
+<menu>
+    <Services>
+        <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
+            <Xray VisibleName="Xray" Order="30">
+                <Dashboard VisibleName="Xray Manager" url="http://{SERVER_ADDR}:5384" target="_blank" Order="10"/>
+            </Xray>
+        </NetBox>
+    </Services>
+</menu>

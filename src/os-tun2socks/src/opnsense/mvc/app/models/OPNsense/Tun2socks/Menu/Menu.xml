@@ -1,0 +1,9 @@
+<menu>
+    <Services>
+        <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
+            <Tun2Socks VisibleName="Tun2Socks" Order="20">
+                <Dashboard VisibleName="Tun2Socks Manager" url="http://{SERVER_ADDR}:5382" target="_blank" Order="10"/>
+            </Tun2Socks>
+        </NetBox>
+    </Services>
+</menu>
