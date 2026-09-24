@@ -43,11 +43,11 @@ type Socks5Section struct {
 }
 
 type MiscSection struct {
-	TaskStackSize int    `yaml:"task-stack-size,omitempty" json:"task_stack_size"`
-	ConnectTimeout int   `yaml:"connect-timeout,omitempty" json:"connect_timeout"`
-	ReadWriteTimeout int `yaml:"read-write-timeout,omitempty" json:"read_write_timeout"`
-	LogFile       string `yaml:"log-file,omitempty" json:"log_file"`
-	LogLevel      string `yaml:"log-level,omitempty" json:"log_level"`
+	TaskStackSize    int    `yaml:"task-stack-size,omitempty" json:"task_stack_size"`
+	ConnectTimeout   int    `yaml:"connect-timeout,omitempty" json:"connect_timeout"`
+	ReadWriteTimeout int    `yaml:"read-write-timeout,omitempty" json:"read_write_timeout"`
+	LogFile          string `yaml:"log-file,omitempty" json:"log_file"`
+	LogLevel         string `yaml:"log-level,omitempty" json:"log_level"`
 }
 
 var (

@@ -1,10 +1,10 @@
 <menu>
     <Services>
-        <MosDNS VisibleName="MosDNS" cssClass="fa fa-sitemap fa-fw">
-            <General VisibleName="Settings" url="/ui/mosdns/general" Order="10"/>
-            <Dashboard VisibleName="Controller Web UI" url="http://{SERVER_ADDR}:5380" target="_blank" Order="20"/>
-            <Tun2Socks VisibleName="Tun2Socks (hev) UI" url="http://{SERVER_ADDR}:5382" target="_blank" Order="25"/>
-            <Log VisibleName="Log File" url="/ui/diagnostics/log/core/mosdns" Order="30"/>
-        </MosDNS>
+        <OPNBox VisibleName="OPN-Box" cssClass="fa fa-cubes fa-fw">
+            <General VisibleName="MosDNS Settings" url="/ui/mosdns/general" Order="10"/>
+            <Dashboard VisibleName="MosDNS Controller" url="http://{SERVER_ADDR}:5380" target="_blank" Order="20"/>
+            <Tun2Socks VisibleName="Tun2Socks Manager" url="http://{SERVER_ADDR}:5382" target="_blank" Order="30"/>
+            <Log VisibleName="MosDNS Log" url="/ui/diagnostics/log/core/mosdns" Order="40"/>
+        </OPNBox>
     </Services>
 </menu>

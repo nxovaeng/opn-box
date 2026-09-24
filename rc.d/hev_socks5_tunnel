@@ -36,3 +36,4 @@ hev_socks5_tunnel_prestart()
 }
 
 run_rc_command "$1"
+
