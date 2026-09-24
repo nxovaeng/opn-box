@@ -27,6 +27,7 @@
       }
     },
     {
+      "_comment": "专供 MosDNS 接入的本地内置 DNS 入站 (接收 127.0.0.1:10853 的 TCP/UDP 查询，路由至 dns-out 走节点出海)",
       "tag": "dns-in",
       "port": 10853,
       "listen": "127.0.0.1",

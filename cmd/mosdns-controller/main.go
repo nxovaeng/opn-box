@@ -182,6 +182,15 @@ func fileExists(p string) bool {
 	return err == nil && !info.IsDir()
 }
 
+func isLoopbackAddr(addr string) bool {
+	clean := strings.TrimPrefix(addr, "tcp://")
+	clean = strings.TrimPrefix(clean, "udp://")
+	clean = strings.TrimPrefix(clean, "https://")
+	return strings.HasPrefix(clean, "127.0.0.1") ||
+		strings.HasPrefix(clean, "localhost") ||
+		strings.HasPrefix(clean, "[::1]")
+}
+
 func loadSettings() ControllerSettings {
 	mu.Lock()
 	defer mu.Unlock()
@@ -236,7 +245,7 @@ func generateMosdnsConfig(s *ControllerSettings) error {
 		addr = strings.TrimSpace(addr)
 		if addr != "" {
 			u := map[string]interface{}{"addr": addr}
-			if s.RemoteSocks5 != "" {
+			if s.RemoteSocks5 != "" && !isLoopbackAddr(addr) {
 				u["socks5"] = s.RemoteSocks5
 				u["enable_pipeline"] = true
 			}

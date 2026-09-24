@@ -116,6 +116,72 @@ Xray 开启了入站嗅探：
 
 ---
 
+### 4. Xray 内置本地 DNS 服务与 MosDNS 联动配置 (`dns-in: 10853`)
+
+为了让 MosDNS 在执行境外出海解析时获得最纯净、无污染的解析结果，Xray-core 原生提供了**本地 DNS 转发入站**（`dns-in`，基于 `dokodemo-door` 协议），并与 MosDNS 紧密协作。
+
+#### (1) Xray 服务端核心配置原理 (`config.json`)
+Xray 内部通过三块配置形成完整的 DNS 接管闭环：
+1. **入站门卫 (`inbounds`)**：开启 `dokodemo-door` 监听在 `127.0.0.1:10853`，同时接管本地 TCP 与 UDP 请求：
+   ```json
+   {
+     "tag": "dns-in",
+     "port": 10853,
+     "listen": "127.0.0.1",
+     "protocol": "dokodemo-door",
+     "settings": {
+       "address": "1.1.1.1",
+       "port": 53,
+       "network": "tcp,udp"
+     }
+   }
+   ```
+2. **DNS 出站与内置引擎 (`dns` & `outbounds`)**：配置海外防污染上游，并通过 `protocol: "dns"` 建立处理出口：
+   ```json
+   "dns": {
+     "servers": ["tcp://1.1.1.1:53", "tcp://8.8.8.8:53"],
+     "queryStrategy": "UseIP"
+   },
+   "outbounds": [
+     { "tag": "dns-out", "protocol": "dns" },
+     { "tag": "proxy-default", "protocol": "vless", ... }
+   ]
+   ```
+3. **路由规则路由分流 (`routing.rules`)**：将来自 `dns-in` 的所有请求强制导向 `dns-out`：
+   ```json
+   {
+     "type": "field",
+     "inboundTag": ["dns-in"],
+     "outboundTag": "dns-out"
+   }
+   ```
+
+#### (2) MosDNS 端的对接配置 (`config.yaml`)
+MosDNS 作为前端守卫，在匹配到出海/未知域名时，直接将上游转发器指向 Xray 的 `10853` 端口：
+```yaml
+plugins:
+  - tag: forward_remote
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        # 直接接入本地 Xray 内置 DNS 服务 (推荐做法)
+        # 注意: 此处为直连本地回环 lo0 端口，切勿配置 socks5 代理！
+        - addr: "127.0.0.1:10853"
+```
+
+#### (3) 两种出海解析模式对比速查
+
+| 对接模式 | MosDNS 上游配置 | 传输路径与协议 | 适用场景与优势 |
+| :--- | :--- | :--- | :--- |
+| **模式 A：直连 Xray `dns-in` (强烈推荐)** | `addr: "127.0.0.1:10853"`<br/>*(不配 socks5)* | `MosDNS -> (lo0 本地直连) -> Xray(10853) -> dns-out -> 代理节点` | **极简、最稳**。由 Xray 内置缓存与多路复用连接池负责出境，MosDNS 零额外代理配置，免疫死锁。 |
+| **模式 B：经本地 SOCKS5 查询公共 DNS** | `addr: "tcp://1.1.1.1:53"`<br/>`socks5: "127.0.0.1:10808"` | `MosDNS -> (SOCKS5 lo0) -> Xray(10808) -> 远端 1.1.1.1` | **备选方案**。MosDNS 自身作为 SOCKS5 客户端直接查询指定的第三方海外公共 DNS。 |
+
+> [!NOTE]
+> 无论是模式 A 还是模式 B，DNS 查询流量**完全在本地回环 (`lo0`) 与加密代理隧道内部流转，绝对不经过 `tun_box` 虚拟网卡**，从物理上杜绝了死锁与首包漏流。
+
+---
+
 ## 四、单二进制管理核心：xray-controller
 
 为了在 FreeBSD 上提供媲美 Linux Web 面板的操作体验，OPN-Box 自研了纯 Go 编写的单二进制管理控制器 `xray-controller`（运行于端口 `:5384`）。
