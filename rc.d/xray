@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# PROVIDE: xray
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="xray"
+rcvar="xray_enable"
+
+load_rc_config $name
+
+: ${xray_enable:="NO"}
+: ${xray_config:="/usr/local/etc/xray/config.json"}
+: ${xray_datadir:="/usr/local/share/xray"}
+: ${xray_logfile:="/var/log/xray.log"}
+: ${xray_pidfile:="/var/run/xray.pid"}
+
+pidfile="${xray_pidfile}"
+command="/usr/sbin/daemon"
+procname="/usr/local/bin/xray"
+command_args="-p ${pidfile} -o ${xray_logfile} -t ${name} /usr/bin/env XRAY_LOCATION_ASSET=${xray_datadir} ${procname} run -c ${xray_config}"
+
+start_precmd="xray_prestart"
+
+xray_prestart()
+{
+    if [ ! -f "${xray_config}" ]; then
+        echo "Configuration file ${xray_config} not found!"
+        return 1
+    fi
+    mkdir -p /var/log /var/run "${xray_datadir}"
+    touch "${xray_logfile}"
+}
+
+run_rc_command "$1"

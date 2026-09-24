@@ -88,19 +88,27 @@ mkdir -p "${STAGE_DIR}/usr/local/sbin" \
          "${STAGE_DIR}/usr/local/etc/rc.d" \
          "${STAGE_DIR}/usr/local/etc/mosdns" \
          "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel" \
+         "${STAGE_DIR}/usr/local/share/xray" \
+         "${STAGE_DIR}/usr/local/etc/xray" \
          "${STAGE_UI_DIR}/usr/local"
 
 mkdir -p "${OUTPUT_DIR}/${ABI}" "${OUTPUT_DIR}/All"
 
-# 1.1 在 FreeBSD 原生环境中源码编译 hev-socks5-tunnel (若尚未编译)
+# 1.1 在 FreeBSD 原生环境中源码编译 hev-socks5-tunnel (若尚未下载到预编译稳定版)
 if [ ! -f "${DIST_DIR}/bin/hev-socks5-tunnel" ]; then
   if command -v gmake >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
-    echo "==> [FreeBSD 原生编译] 正在通过 gmake 编译 hev-socks5-tunnel..."
+    echo "==> [FreeBSD 原生编译] 正在通过稳定 Release Tag 源码编译 hev-socks5-tunnel..."
     HEV_SRC_DIR="/tmp/hev-socks5-tunnel-src"
     rm -rf "${HEV_SRC_DIR}"
-    git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel.git "${HEV_SRC_DIR}"
+    git clone --recursive https://github.com/heiher/hev-socks5-tunnel.git "${HEV_SRC_DIR}"
     (
       cd "${HEV_SRC_DIR}"
+      LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "")
+      if [ -n "${LATEST_TAG}" ]; then
+        echo "    -> 检出官方稳定版本标签: ${LATEST_TAG}"
+        git checkout "${LATEST_TAG}" 2>/dev/null || true
+        git submodule update --init --recursive
+      fi
       gmake
       mkdir -p "${DIST_DIR}/bin"
       cp bin/hev-socks5-tunnel "${DIST_DIR}/bin/"
@@ -128,6 +136,11 @@ fi
 [ -f "${DIST_DIR}/bin/sing-box" ] && cp "${DIST_DIR}/bin/sing-box" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/hev-socks5-tunnel" ] && cp "${DIST_DIR}/bin/hev-socks5-tunnel" "${STAGE_DIR}/usr/local/bin/"
 [ -f "${DIST_DIR}/bin/hev-controller" ] && cp "${DIST_DIR}/bin/hev-controller" "${STAGE_DIR}/usr/local/bin/"
+[ -f "${DIST_DIR}/bin/xray" ] && cp "${DIST_DIR}/bin/xray" "${STAGE_DIR}/usr/local/bin/"
+
+if [ -d "${DIST_DIR}/share/xray" ]; then
+  cp -r "${DIST_DIR}/share/xray/"* "${STAGE_DIR}/usr/local/share/xray/" 2>/dev/null || true
+fi
 
 if [ -f "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" ]; then
   cp "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" "${STAGE_DIR}/usr/local/etc/rc.d/"
@@ -141,6 +154,12 @@ elif [ -f "${DIST_DIR}/rc.d/hev_controller" ]; then
   cp "${DIST_DIR}/rc.d/hev_controller" "${STAGE_DIR}/usr/local/etc/rc.d/"
 fi
 
+if [ -f "${WORKSPACE_DIR}/rc.d/xray" ]; then
+  cp "${WORKSPACE_DIR}/rc.d/xray" "${STAGE_DIR}/usr/local/etc/rc.d/"
+elif [ -f "${DIST_DIR}/rc.d/xray" ]; then
+  cp "${DIST_DIR}/rc.d/xray" "${STAGE_DIR}/usr/local/etc/rc.d/"
+fi
+
 if [ -f "${WORKSPACE_DIR}/config.example.yaml" ]; then
   cp "${WORKSPACE_DIR}/config.example.yaml" "${STAGE_DIR}/usr/local/etc/mosdns/config.yaml.sample"
 elif [ -f "${DIST_DIR}/etc/mosdns.yaml.example" ]; then
@@ -151,6 +170,12 @@ if [ -f "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" ]; then
   cp "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel/config.yaml.sample"
 elif [ -f "${DIST_DIR}/etc/hev-socks5-tunnel.yaml.example" ]; then
   cp "${DIST_DIR}/etc/hev-socks5-tunnel.yaml.example" "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel/config.yaml.sample"
+fi
+
+if [ -f "${WORKSPACE_DIR}/config.xray.example.json" ]; then
+  cp "${WORKSPACE_DIR}/config.xray.example.json" "${STAGE_DIR}/usr/local/etc/xray/config.json.sample"
+elif [ -f "${DIST_DIR}/etc/xray.json.example" ]; then
+  cp "${DIST_DIR}/etc/xray.json.example" "${STAGE_DIR}/usr/local/etc/xray/config.json.sample"
 fi
 
 chmod +x "${STAGE_DIR}/usr/local/sbin/"* "${STAGE_DIR}/usr/local/bin/"* "${STAGE_DIR}/usr/local/etc/rc.d/"* 2>/dev/null || true
@@ -308,7 +333,34 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.7 Package: os-mosdns (OPNsense WebGUI 插件)
+# 3.7 Package: xray-core (官方稳定版代理内核，原生支持 xhttp、VLESS 与 SNI 嗅探)
+# ------------------------------------------------------------------------------
+if [ -f "${STAGE_DIR}/usr/local/bin/xray" ]; then
+  echo "==> 打包 xray-core (官方稳定版)..."
+  cat << EOF > /tmp/manifest_xray
+name: xray-core
+version: "25.1.30"
+origin: security/xray-core
+comment: "Xray-core proxy engine with VLESS, xhttp and sniffing support"
+desc: "Official Xray-core pre-compiled release packaged for OPNsense"
+maintainer: "admin@opn-box.local"
+www: "${PROJECT_WEB_URL}"
+prefix: /usr/local
+categories: [security]
+arch: "FreeBSD:*:amd64"
+EOF
+  rm -f /tmp/plist_xray
+  [ -f "${STAGE_DIR}/usr/local/bin/xray" ] && echo "bin/xray" >> /tmp/plist_xray
+  [ -f "${STAGE_DIR}/usr/local/share/xray/geoip.dat" ] && echo "share/xray/geoip.dat" >> /tmp/plist_xray
+  [ -f "${STAGE_DIR}/usr/local/share/xray/geosite.dat" ] && echo "share/xray/geosite.dat" >> /tmp/plist_xray
+  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/xray" ] && echo "etc/rc.d/xray" >> /tmp/plist_xray
+  [ -f "${STAGE_DIR}/usr/local/etc/xray/config.json.sample" ] && echo "etc/xray/config.json.sample" >> /tmp/plist_xray
+
+  pkg create -M /tmp/manifest_xray -p /tmp/plist_xray -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+fi
+
+# ------------------------------------------------------------------------------
+# 3.8 Package: os-mosdns (OPNsense WebGUI 插件)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-mosdns/src" ]; then
   echo "==> 打包 os-mosdns (OPNsense UI 插件)..."

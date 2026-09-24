@@ -167,17 +167,48 @@ if [ "${BUILD_SINGBOX:-1}" = "1" ]; then
 fi
 
 # ------------------------------------------------------------------------------
+# 5. 拉取外部依赖的官方已发布稳定版 (FreeBSD 64位 二进制)
+# ------------------------------------------------------------------------------
+echo "==> [5/6] 检查/下载 hev-socks5-tunnel 官方已发布稳定版..."
+if curl -fsSL -o "${OUTPUT_DIR}/hev-socks5-tunnel" "https://github.com/heiher/hev-socks5-tunnel/releases/latest/download/hev-socks5-tunnel-freebsd-x86_64"; then
+    chmod +x "${OUTPUT_DIR}/hev-socks5-tunnel"
+    echo "    -> hev-socks5-tunnel 官方稳定版获取成功"
+else
+    echo "    -> 未能直接下载 hev-socks5-tunnel 预编译二进制，将在 FreeBSD VM 步骤中通过源码 Release Tag 编译"
+fi
+
+echo "==> [6/6] 检查/下载 Xray-core 官方已发布稳定版 (FreeBSD 64-bit)..."
+XRAY_DL_DIR="${BUILD_TMP}/xray-dl"
+mkdir -p "${XRAY_DL_DIR}" "${WORKSPACE_DIR}/dist/share/xray"
+if curl -fsSL -o "${XRAY_DL_DIR}/xray.zip" "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-freebsd-64.zip"; then
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -q -o "${XRAY_DL_DIR}/xray.zip" -d "${XRAY_DL_DIR}/"
+    else
+        python3 -c "import zipfile; zipfile.ZipFile('${XRAY_DL_DIR}/xray.zip').extractall('${XRAY_DL_DIR}')"
+    fi
+    [ -f "${XRAY_DL_DIR}/xray" ] && cp "${XRAY_DL_DIR}/xray" "${OUTPUT_DIR}/xray" && chmod +x "${OUTPUT_DIR}/xray"
+    [ -f "${XRAY_DL_DIR}/geoip.dat" ] && cp "${XRAY_DL_DIR}/geoip.dat" "${WORKSPACE_DIR}/dist/share/xray/"
+    [ -f "${XRAY_DL_DIR}/geosite.dat" ] && cp "${XRAY_DL_DIR}/geosite.dat" "${WORKSPACE_DIR}/dist/share/xray/"
+    echo "    -> Xray-core 官方稳定版获取并解压成功"
+else
+    echo "    [WARN] Xray-core 官方下载失败，跳过打包"
+fi
+
+# ------------------------------------------------------------------------------
 # 7. 同步配置文件模板与 rc.d 服务启动脚本至 dist/ 目录
 # ------------------------------------------------------------------------------
 mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc"
 [ -f "${WORKSPACE_DIR}/rc.d/pf_aliasd" ] && cp "${WORKSPACE_DIR}/rc.d/pf_aliasd" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" ] && cp "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_controller" ] && cp "${WORKSPACE_DIR}/rc.d/hev_controller" "${WORKSPACE_DIR}/dist/rc.d/"
+[ -f "${WORKSPACE_DIR}/rc.d/xray" ] && cp "${WORKSPACE_DIR}/rc.d/xray" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/config.example.yaml" ] && cp "${WORKSPACE_DIR}/config.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns.yaml.example"
 [ -f "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" ] && cp "${WORKSPACE_DIR}/config.hev-socks5-tunnel.example.yaml" "${WORKSPACE_DIR}/dist/etc/hev-socks5-tunnel.yaml.example"
+[ -f "${WORKSPACE_DIR}/config.xray.example.json" ] && cp "${WORKSPACE_DIR}/config.xray.example.json" "${WORKSPACE_DIR}/dist/etc/xray.json.example"
 
 echo "=========================================================="
-echo " 自编译完成！产物列表 (全量 FreeBSD 64位 ELF 二进制):"
+echo " 二进制准备完成！产物列表 (全量 FreeBSD 64位 ELF 二进制):"
 ls -lh "${OUTPUT_DIR}"
 echo "=========================================================="
+
 

@@ -134,8 +134,8 @@ fetch -o /usr/local/etc/pkg/repos/opnbox.conf ${BASE_URL}/opnbox.conf
 # 2. 更新软件源索引
 pkg update -r opnbox
 
-# 3. 安装 os-mosdns 插件及核心套件 (含 sing-box 与 hev-socks5-tunnel)
-pkg install -y os-mosdns sing-box hev-socks5-tunnel</code></pre>
+# 3. 安装 os-mosdns 插件及核心套件 (含 sing-box, hev-socks5-tunnel 与 xray-core)
+pkg install -y os-mosdns sing-box hev-socks5-tunnel xray-core</code></pre>
     </div>
 
     <div class="card">
@@ -178,6 +178,11 @@ pkg install -y os-mosdns sing-box hev-socks5-tunnel</code></pre>
             <td><strong>hev-socks5-tunnel</strong></td>
             <td><code>amd64</code></td>
             <td>纯 C 协程极致性能 Tun2Socks 虚拟网卡代理，内嵌 hev-controller Web 管理面板 (端口 :5382)</td>
+          </tr>
+          <tr>
+            <td><strong>xray-core</strong></td>
+            <td><code>amd64</code></td>
+            <td>官方稳定版 Xray 代理内核，原生支持 VLESS、xhttp (SplitHTTP) 与 SNI 嗅探二次分流</td>
           </tr>
         </tbody>
       </table>
