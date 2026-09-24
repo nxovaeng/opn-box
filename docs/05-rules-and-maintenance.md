@@ -119,3 +119,4 @@ pgrep -fl xray
 # 查看 Xray 实时分流访问日志 (观察出站 tag 是否匹配到预期节点)
 tail -f /var/log/xray.log
 ```
+

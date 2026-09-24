@@ -53,3 +53,4 @@ OPN-Box 是专为 **OPNsense (FreeBSD 14 & 15 amd64)** 打造的高性能全链�
 | **hev-controller** | `:5382` | Go / 内嵌 SPA / YAML 操作 | `/var/log/hev-controller.log` | [04-control-plane-and-ui.md](file:///home/yaofen/opn-box/docs/04-control-plane-and-ui.md) |
 | **xray-core** | `:10808` 等 | Go / VLESS / xhttp / REALITY / Sniffing | `/usr/local/etc/xray/config.json` | [03-dataplane-tun-xray.md](file:///home/yaofen/opn-box/docs/03-dataplane-tun-xray.md) |
 | **xray-controller** | `:5384` | Go / 内嵌 SPA / 订阅解析 / 路由合成 | `/usr/local/etc/xray/controller_data.json` | [04-control-plane-and-ui.md](file:///home/yaofen/opn-box/docs/04-control-plane-and-ui.md) |
+

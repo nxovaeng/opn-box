@@ -163,3 +163,4 @@ OPN-Box 在进程间通信中抛弃了低效的纯文本或 JSON 格式，在 `p
   - **Destination**：选择别名 `GFW_Proxy`；
   - **Gateway**：选择虚拟代理网关（即指向 `tun0` 网卡的 Gateway 目标）。
 - 即可让所有命中该表的 IP 流量全部被内核底层拦截并导向 TUN 网卡。
+

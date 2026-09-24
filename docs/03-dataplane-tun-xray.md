@@ -131,3 +131,4 @@ Xray 开启了入站嗅探：
    - 任何改动不会直接写入生产配置；
    - 后端先在 `/tmp/xray_test.json` 生成测试配置，并调用 `xray run -test -c /tmp/xray_test.json` 进行语法与证书有效性检验；
    - 检验 100% 通过后，才原子替换 `/usr/local/etc/xray/config.json` 并平滑重载服务。
+
