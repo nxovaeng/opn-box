@@ -79,12 +79,14 @@ PROJECT_WEB_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}"
 
 # 严格指定目标系统 ABI 为 FreeBSD 15 (FreeBSD:15:amd64)，杜绝通配符
 ABI="FreeBSD:15:amd64"
+TARGET_PKG_DIR="${OUTPUT_DIR}/${ABI}"
 
 echo "=========================================================="
 echo " 开始生成 OPNsense 软件源仓库 (FreeBSD pkg repo)"
 echo " 工作目录:   ${WORKSPACE_DIR}"
 echo " 编译产物:   ${DIST_DIR}"
 echo " 目标源目录: ${OUTPUT_DIR}"
+echo " 目标ABI目录: ${TARGET_PKG_DIR}"
 echo " 发布目录:   ${PUBLISH_DIR}"
 echo " 当前系统ABI: ${ABI}"
 echo " 仓库终端URL: ${CLIENT_REPO_URL}"
@@ -93,7 +95,7 @@ echo " 官源 hev 版本: v${HEV_TUNNEL_VERSION}"
 echo " 官源 xray 版本: v${XRAY_VERSION}"
 echo "=========================================================="
 
-# 1. 准备 Staging 目录结构
+# 1. 准备 Staging 与 Output 目录结构
 STAGE_DIR="/tmp/stage"
 STAGE_UI_DIR="/tmp/stage-ui"
 rm -rf "${STAGE_DIR}" "${STAGE_UI_DIR}"
@@ -106,7 +108,9 @@ mkdir -p "${STAGE_DIR}/usr/local/sbin" \
          "${STAGE_DIR}/usr/local/etc/xray" \
          "${STAGE_UI_DIR}/usr/local"
 
-mkdir -p "${OUTPUT_DIR}/${ABI}" "${OUTPUT_DIR}/All"
+# 清理并创建确定的 ABI 目标目录（根目录不留多余 All 或 FreeBSD 14 目录）
+rm -rf "${OUTPUT_DIR}"
+mkdir -p "${TARGET_PKG_DIR}"
 
 # 1.1 在 FreeBSD 原生环境中源码编译 hev-socks5-tunnel (若尚未下载到预编译稳定版)
 if [ ! -f "${DIST_DIR}/bin/hev-socks5-tunnel" ]; then
@@ -228,7 +232,7 @@ EOF
 sbin/pf-aliasd
 etc/rc.d/pf_aliasd
 EOF
-  pkg create -M /tmp/manifest_pf_aliasd -p /tmp/plist_pf_aliasd -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_pf_aliasd -p /tmp/plist_pf_aliasd -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -256,7 +260,7 @@ EOF
 bin/mosdns
 etc/mosdns/config.yaml.sample
 EOF
-  pkg create -M /tmp/manifest_mosdns -p /tmp/plist_mosdns -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_mosdns -p /tmp/plist_mosdns -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -284,7 +288,7 @@ EOF
 bin/mosdns-x
 etc/mosdns/config.yaml.sample
 EOF
-  pkg create -M /tmp/manifest_mosdns_x -p /tmp/plist_mosdns_x -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_mosdns_x -p /tmp/plist_mosdns_x -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -308,7 +312,7 @@ EOF
   cat << EOF > /tmp/plist_controller
 bin/mosdns-controller
 EOF
-  pkg create -M /tmp/manifest_controller -p /tmp/plist_controller -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_controller -p /tmp/plist_controller -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -332,7 +336,7 @@ EOF
   cat << EOF > /tmp/plist_singbox
 bin/sing-box
 EOF
-  pkg create -M /tmp/manifest_singbox -p /tmp/plist_singbox -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_singbox -p /tmp/plist_singbox -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -360,7 +364,7 @@ EOF
   [ -f "${STAGE_DIR}/usr/local/etc/rc.d/hev_controller" ] && echo "etc/rc.d/hev_controller" >> /tmp/plist_hev
   [ -f "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel/config.yaml.sample" ] && echo "etc/hev-socks5-tunnel/config.yaml.sample" >> /tmp/plist_hev
 
-  pkg create -M /tmp/manifest_hev -p /tmp/plist_hev -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_hev -p /tmp/plist_hev -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -390,7 +394,7 @@ EOF
   [ -f "${STAGE_DIR}/usr/local/etc/rc.d/xray_controller" ] && echo "etc/rc.d/xray_controller" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/etc/xray/config.json.sample" ] && echo "etc/xray/config.json.sample" >> /tmp/plist_xray
 
-  pkg create -M /tmp/manifest_xray -p /tmp/plist_xray -r "${STAGE_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_xray -p /tmp/plist_xray -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -429,24 +433,19 @@ sbin/update-opnbox-rules.sh
 opnsense/service/conf/actions.d/actions_mosdns.conf
 opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml
 EOF
-  pkg create -M /tmp/manifest_os_mosdns -p /tmp/plist_os_mosdns -r "${STAGE_UI_DIR}" -o "${OUTPUT_DIR}/All"
+  pkg create -M /tmp/manifest_os_mosdns -p /tmp/plist_os_mosdns -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
 # 4. 生成软件源元数据索引 (pkg repo)
 # ------------------------------------------------------------------------------
-echo "==> 生成 FreeBSD pkg 索引目录 (pkg repo)..."
-pkg repo "${OUTPUT_DIR}/All"
-
-echo "==> 同步生成 FreeBSD:15:amd64 软件源发布路径..."
-mkdir -p "${OUTPUT_DIR}/FreeBSD:15:amd64"
-cp "${OUTPUT_DIR}/All"/* "${OUTPUT_DIR}/FreeBSD:15:amd64/"
-cp "${OUTPUT_DIR}/All"/* "${OUTPUT_DIR}/"
+echo "==> 在 ${TARGET_PKG_DIR} 生成 FreeBSD:15:amd64 pkg 索引与元数据..."
+pkg repo "${TARGET_PKG_DIR}"
 
 # ------------------------------------------------------------------------------
-# 5. 生成客户端配置文件 opnbox.conf
+# 5. 生成客户端配置文件 opnbox.conf (根目录仅保留 opnbox.conf 及 ABI 子目录)
 # ------------------------------------------------------------------------------
-echo "==> 生成 OPNsense 客户端配置文件 opnbox.conf..."
+echo "==> 在根目录生成 OPNsense 客户端配置文件 opnbox.conf..."
 cat << EOF > "${OUTPUT_DIR}/opnbox.conf"
 opnbox: {
   url: "${CLIENT_REPO_URL}/\${ABI}",
@@ -462,12 +461,15 @@ EOF
 # ------------------------------------------------------------------------------
 if [ -n "${PUBLISH_DIR}" ]; then
   echo "==> 复制产物到发布目录: ${PUBLISH_DIR}..."
+  rm -rf "${PUBLISH_DIR}"
   mkdir -p "${PUBLISH_DIR}"
   cp -r "${OUTPUT_DIR}"/* "${PUBLISH_DIR}/"
 fi
 
 echo "=========================================================="
 echo " OPNsense 软件源仓库生成完毕！"
-echo " 产物列表:"
-ls -lh "${OUTPUT_DIR}/All"
+echo " 根目录结构 (仅保留 opnbox.conf 与 ABI 目录):"
+ls -lh "${OUTPUT_DIR}"
+echo " FreeBSD:15:amd64 软件源包与元数据列表:"
+ls -lh "${TARGET_PKG_DIR}"
 echo "=========================================================="
