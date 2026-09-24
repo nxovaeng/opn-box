@@ -20,6 +20,7 @@ trap 'rm -rf "${BUILD_TMP}"' EXIT
 export GOOS=freebsd
 export GOARCH=amd64
 export CGO_ENABLED=0
+export GOTOOLCHAIN=auto
 
 # --- 明确锁定的上游版本号 (严格指定版本号) ---
 SINGBOX_VERSION="${SINGBOX_VERSION:-1.13.14}"
