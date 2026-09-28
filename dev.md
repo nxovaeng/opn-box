@@ -92,7 +92,13 @@ OPNsense 官方源内置了 `security/xray-core`（如 `xray-core-26.7.28_1`）�
   2. `os-netbox` 原先的 `Menu.xml` 仅包含 `<Dashboard>` 节点，其余 3 个组件的菜单分散在各自子插件的 Menu.xml 中。若子插件未被缓存识别，左侧边栏则仅显示仪表盘。
 - **修复**：
   1. 在 `src/os-netbox/src/opnsense/mvc/app/models/OPNsense/Netbox/Menu/Menu.xml` 与 `ACL.xml` 中直接汇总声明完整 4 项导航菜单（仪表盘、MosDNS 智能分流、Tun2Socks 虚拟网卡、Xray 代理核心）；
-  2. 消除「配置错误」提示只需在 OPNsense 后台 **System > Firmware > Status** 中运行审计并点击 **“Reset all local conflicts”** 接受当前安装状态。
+### 9. 插件/套件卸载后后台 Controller 服务端仍在运行
+- **根因**：FreeBSD 的 `pkg` 软件包管理器在卸载包（`pkg remove` 或 WebGUI 卸载）时，仅从文件系统删除文件，绝不会自动杀死正在运行的内存进程。此前各底层守护进程包（`mosdns-controller`、`hev-controller`、`xray-controller`、`pf-aliasd`、`mosdns`、`hev-socks5-tunnel`）未包含 `pre-deinstall` 脚本，且 `os-netbox` 的 `pre-deinstall` 仅清理了菜单缓存，导致软件包文件被删除后，内存中的 Controller 和代理核心依然以孤儿守护进程持续运行并霸占端口（5380、5382、5384）。
+- **修复**：
+  1. 在 `scripts/package_repo.sh` 中为所有守护进程与 UI 插件的 pkg Manifest 补充注入 `pre-deinstall` 钩子：
+     - 各底层包在卸载前执行 `service <svc> onestop 2>/dev/null || true` 并附带 `killall -9 <proc>`；
+     - `os-netbox` 总套件在卸载前执行 `/usr/local/sbin/opnbox-control stop all` 并全面清理全套件孤儿进程。
+  2. 若现场已卸载但进程仍驻留，管理员只需在终端执行一次强力终止指令即可彻底清除。
 
 ---
 

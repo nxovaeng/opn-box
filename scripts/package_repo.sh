@@ -249,6 +249,9 @@ prefix: /usr/local
 categories: [net]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
+scripts: {
+  pre-deinstall: "#!/bin/sh\nservice pf_aliasd onestop 2>/dev/null || true\nkillall -9 pf-aliasd 2>/dev/null || true"
+}
 EOF
   cat << EOF > /tmp/plist_pf_aliasd
 sbin/pf-aliasd
@@ -276,6 +279,9 @@ abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
   pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" }
+}
+scripts: {
+  pre-deinstall: "#!/bin/sh\nservice mosdns onestop 2>/dev/null || true\nkillall -9 mosdns 2>/dev/null || true"
 }
 EOF
   cat << EOF > /tmp/plist_mosdns
@@ -306,6 +312,9 @@ arch: "FreeBSD:15:amd64"
 deps: {
   pf-aliasd: { version: "${BUILD_DATE}", origin: "net/pf-aliasd" }
 }
+scripts: {
+  pre-deinstall: "#!/bin/sh\nservice mosdns onestop 2>/dev/null || true\nkillall -9 mosdns-x 2>/dev/null || true"
+}
 EOF
   cat << EOF > /tmp/plist_mosdns_x
 bin/mosdns-x
@@ -331,6 +340,9 @@ prefix: /usr/local
 categories: [dns]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
+scripts: {
+  pre-deinstall: "#!/bin/sh\nservice mosdns_controller onestop 2>/dev/null || true\nkillall -9 mosdns-controller 2>/dev/null || true"
+}
 EOF
   cat << EOF > /tmp/plist_controller
 bin/mosdns-controller
@@ -381,6 +393,9 @@ prefix: /usr/local
 categories: [net]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
+scripts: {
+  pre-deinstall: "#!/bin/sh\nservice hev_controller onestop 2>/dev/null || true\nkillall -9 hev-controller 2>/dev/null || true"
+}
 EOF
   cat << EOF > /tmp/plist_hev_controller
 bin/hev-controller
@@ -407,6 +422,9 @@ prefix: /usr/local
 categories: [net]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
+scripts: {
+  pre-deinstall: "#!/bin/sh\nservice hev_socks5_tunnel onestop 2>/dev/null || true\nkillall -9 hev-socks5-tunnel 2>/dev/null || true"
+}
 EOF
   cat << EOF > /tmp/plist_hev
 bin/hev-socks5-tunnel
@@ -432,6 +450,9 @@ prefix: /usr/local
 categories: [security]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
+scripts: {
+  pre-deinstall: "#!/bin/sh\nservice xray_controller onestop 2>/dev/null || true\nkillall -9 xray-controller 2>/dev/null || true"
+}
 EOF
   cat << EOF > /tmp/plist_xray_controller
 bin/xray-controller
@@ -480,7 +501,7 @@ deps: {
 }
 scripts: {
   post-install: "#!/bin/sh\nmkdir -p /usr/local/etc/mosdns/rule\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\nfor r in cn.txt gfw.txt custom-direct.txt custom-proxy.txt; do [ -s /usr/local/etc/mosdns/rule/\$r ] || echo 'domain:internal.lan' > /usr/local/etc/mosdns/rule/\$r; done\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true",
-  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
+  pre-deinstall: "#!/bin/sh\n[ -x /usr/local/sbin/mosdns-control ] && /usr/local/sbin/mosdns-control stop 2>/dev/null || true\nservice mosdns_controller onestop 2>/dev/null || true\nservice mosdns onestop 2>/dev/null || true\nservice pf_aliasd onestop 2>/dev/null || true\nkillall -9 mosdns-controller mosdns pf-aliasd 2>/dev/null || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
 }
 EOF
   (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_mosdns
@@ -517,7 +538,7 @@ deps: {
 }
 scripts: {
   post-install: "#!/bin/sh\n[ -f /usr/local/etc/hev-socks5-tunnel/config.yaml.sample ] && [ ! -f /usr/local/etc/hev-socks5-tunnel/config.yaml ] && cp /usr/local/etc/hev-socks5-tunnel/config.yaml.sample /usr/local/etc/hev-socks5-tunnel/config.yaml || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true",
-  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
+  pre-deinstall: "#!/bin/sh\n[ -x /usr/local/sbin/tun2socks-control ] && /usr/local/sbin/tun2socks-control stop 2>/dev/null || true\nservice hev_controller onestop 2>/dev/null || true\nservice hev_socks5_tunnel onestop 2>/dev/null || true\nkillall -9 hev-controller hev-socks5-tunnel 2>/dev/null || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
 }
 EOF
   (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_tun2socks
@@ -554,7 +575,7 @@ deps: {
 }
 scripts: {
   post-install: "#!/bin/sh\nmkdir -p /usr/local/etc/xray-core /usr/local/share/xray-core /usr/local/share/xray\n[ -f /usr/local/etc/xray-core/controller_data.json.sample ] && [ ! -f /usr/local/etc/xray-core/controller_data.json ] && cp /usr/local/etc/xray-core/controller_data.json.sample /usr/local/etc/xray-core/controller_data.json || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true",
-  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
+  pre-deinstall: "#!/bin/sh\n[ -x /usr/local/sbin/xray-control ] && /usr/local/sbin/xray-control stop 2>/dev/null || true\nservice xray_controller onestop 2>/dev/null || true\nservice xray onestop 2>/dev/null || true\nkillall -9 xray-controller 2>/dev/null || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
 }
 EOF
   (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_xray
@@ -597,7 +618,7 @@ deps: {
 }
 scripts: {
   post-install: "#!/bin/sh\nmkdir -p /usr/local/etc/mosdns/rule /usr/local/etc/hev-socks5-tunnel /usr/local/etc/xray-core /usr/local/share/xray-core /usr/local/share/xray\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\nfor r in cn.txt gfw.txt custom-direct.txt custom-proxy.txt; do [ -s /usr/local/etc/mosdns/rule/\$r ] || echo 'domain:internal.lan' > /usr/local/etc/mosdns/rule/\$r; done\n[ -f /usr/local/etc/hev-socks5-tunnel/config.yaml.sample ] && [ ! -f /usr/local/etc/hev-socks5-tunnel/config.yaml ] && cp /usr/local/etc/hev-socks5-tunnel/config.yaml.sample /usr/local/etc/hev-socks5-tunnel/config.yaml || true\n[ -f /usr/local/etc/xray-core/controller_data.json.sample ] && [ ! -f /usr/local/etc/xray-core/controller_data.json ] && cp /usr/local/etc/xray-core/controller_data.json.sample /usr/local/etc/xray-core/controller_data.json || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true",
-  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
+  pre-deinstall: "#!/bin/sh\n[ -x /usr/local/sbin/opnbox-control ] && /usr/local/sbin/opnbox-control stop all 2>/dev/null || true\nfor s in xray_controller xray hev_controller hev_socks5_tunnel mosdns_controller mosdns pf_aliasd; do service \$s onestop 2>/dev/null || true; done\nkillall -9 mosdns-controller hev-controller xray-controller pf-aliasd mosdns hev-socks5-tunnel 2>/dev/null || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\nservice configd restart >/dev/null 2>&1 || true"
 }
 EOF
   (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_netbox
