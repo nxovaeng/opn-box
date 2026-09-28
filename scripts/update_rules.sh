@@ -18,7 +18,7 @@
 RULE_DIR="/usr/local/etc/mosdns/rule"
 XRAY_DIR="/usr/local/share/xray-core"
 RESTART_SERVICES=1
-MIRROR_ENABLED=0
+MIRROR_ENABLED=1
 
 # 多镜像通道
 PRIMARY_BASE="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download"
@@ -30,7 +30,8 @@ usage() {
     echo "选项:"
     echo "  --rule-dir <dir>   MosDNS 规则存放目录 (默认: ${RULE_DIR})"
     echo "  --xray-dir <dir>   Xray 规则存放目录 (默认: ${XRAY_DIR})"
-    echo "  --mirror           优先使用国内加速镜像源同步"
+    echo "  --mirror           优先使用国内加速镜像源同步 (默认已启用)"
+    echo "  --no-mirror        禁用加速镜像，直接从 GitHub 官方源下载"
     echo "  --no-restart       更新后不自动重启相关服务"
     echo "  -h, --help         显示帮助信息"
     exit 0
@@ -41,6 +42,7 @@ while [ $# -gt 0 ]; do
         --rule-dir) RULE_DIR="$2"; shift 2 ;;
         --xray-dir) XRAY_DIR="$2"; shift 2 ;;
         --mirror) MIRROR_ENABLED=1; shift 1 ;;
+        --no-mirror) MIRROR_ENABLED=0; shift 1 ;;
         --no-restart) RESTART_SERVICES=0; shift 1 ;;
         -h|--help) usage ;;
         *) echo "未知参数: $1" >&2; exit 1 ;;
@@ -51,7 +53,7 @@ fetch_url() {
     url="$1"
     output="$2"
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 8 -m 120 -o "${output}" "${url}" >/dev/null 2>&1
+        curl -fsSL --connect-timeout 6 -m 90 -o "${output}" "${url}" >/dev/null 2>&1
         return $?
     elif command -v fetch >/dev/null 2>&1; then
         fetch -q -T 10 -o "${output}" "${url}" >/dev/null 2>&1

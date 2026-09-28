@@ -150,10 +150,15 @@ $(document).ready(function() {
     $('#link-tun2socks').attr('href', tun2socksUrl);
     $('#link-xray').attr('href', xrayUrl);
 
-    function refreshStatus() {
+    function refreshStatus(updateTerminal) {
+        if (typeof updateTerminal === 'undefined') {
+            updateTerminal = true;
+        }
         $.getJSON('/api/netbox/service/status', function(data) {
             if (data && data.output) {
-                $('#status-terminal').text(data.output);
+                if (updateTerminal) {
+                    $('#status-terminal').text(data.output);
+                }
                 
                 // 根据输出更新状态 Badge
                 updateBadge('mosdns', data.output.indexOf('mosdns is running') !== -1 || data.output.indexOf('mosdns_controller is running') !== -1);
@@ -176,25 +181,32 @@ $(document).ready(function() {
         btn.prop('disabled', true);
         var oldHtml = btn.html();
         btn.html('<i class="fa fa-spinner fa-spin fa-fw"></i> 执行中...');
-        $('#action-alert').removeClass('alert-danger alert-info alert-success').addClass('alert-warning').html('<i class="fa fa-spinner fa-spin fa-fw"></i> 正在执行动作 [' + actionName + ']，请稍候...').show();
-        $('#status-terminal').text('==> 正在向 OPNsense 后台调度引擎下发指令 [' + actionName + ']，请稍候...\n');
+        var actionLabel = (actionName === 'updateRules') ? '全量更新规则库' :
+                          (actionName === 'start') ? '启动全套件' :
+                          (actionName === 'stop') ? '停止全套件' :
+                          (actionName === 'restart') ? '重启全套件' : actionName;
+        $('#action-alert').removeClass('alert-danger alert-info alert-success').addClass('alert-warning').html('<i class="fa fa-spinner fa-spin fa-fw"></i> 正在执行动作 [' + actionLabel + ']，请稍候...').show();
+        $('#status-terminal').text('==> 正在向 OPNsense 后台调度引擎下发指令 [' + actionLabel + ']，请稍候...\n');
 
         $.ajax({
             url: '/api/netbox/service/' + actionName,
             type: 'POST',
             dataType: 'json',
-            timeout: 180000
+            timeout: 300000
         }).done(function(res) {
             btn.prop('disabled', false).html(oldHtml);
             if (res && res.output) {
                 $('#status-terminal').text(res.output);
             }
             if (res && res.status === 'ok') {
-                $('#action-alert').removeClass('alert-warning alert-danger').addClass('alert-success').html('<i class="fa fa-check fa-fw"></i> 指令执行完毕！').delay(4000).fadeOut();
+                $('#action-alert').removeClass('alert-warning alert-danger').addClass('alert-success').html('<i class="fa fa-check fa-fw"></i> [' + actionLabel + '] 执行完毕！').delay(5000).fadeOut();
             } else {
-                $('#action-alert').removeClass('alert-warning alert-success').addClass('alert-danger').html('<i class="fa fa-exclamation-triangle fa-fw"></i> 指令执行返回异常或被系统拦截，请查看下方诊断终端！');
+                $('#action-alert').removeClass('alert-warning alert-success').addClass('alert-danger').html('<i class="fa fa-exclamation-triangle fa-fw"></i> [' + actionLabel + '] 执行返回异常或被系统拦截，请查看下方诊断终端！');
             }
-            setTimeout(refreshStatus, 800);
+            // 仅静默同步运行状态 Badge，切勿覆盖终端内已有的指令输出！
+            setTimeout(function() {
+                refreshStatus(false);
+            }, 1000);
         }).fail(function(xhr, status, error) {
             btn.prop('disabled', false).html(oldHtml);
             $('#action-alert').removeClass('alert-warning alert-success').addClass('alert-danger').html('<i class="fa fa-times fa-fw"></i> 请求失败 (' + status + '): ' + error);
@@ -206,7 +218,7 @@ $(document).ready(function() {
     $('#btn-stop-all').click(function() { runServiceAction('stop', $(this)); });
     $('#btn-restart-all').click(function() { runServiceAction('restart', $(this)); });
     $('#btn-update-rules').click(function() { runServiceAction('updateRules', $(this)); });
-    $('#btn-refresh-status').click(function() { refreshStatus(); });
+    $('#btn-refresh-status').click(function() { refreshStatus(true); });
 
     window.openEmbeddedView = function(linkId, title) {
         var url = $('#' + linkId).attr('href');

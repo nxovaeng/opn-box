@@ -12,6 +12,7 @@ class ServiceController extends ApiControllerBase
         $trim = trim($response ?? '');
         $lower = strtolower($trim);
         $isError = (
+            empty($trim) ||
             strpos($lower, 'action not allowed') !== false ||
             strpos($lower, 'action not found') !== false ||
             strpos($lower, 'not permitted') !== false ||
@@ -19,7 +20,7 @@ class ServiceController extends ApiControllerBase
         );
         return [
             'status' => $isError ? 'failed' : 'ok',
-            'output' => $trim
+            'output' => !empty($trim) ? $trim : '执行失败：后台调度服务 (configd) 未返回任何输出，请检查 actions 配置或服务状态'
         ];
     }
 
@@ -66,18 +67,23 @@ class ServiceController extends ApiControllerBase
             $backend = new Backend();
             $candidates = [
                 'netbox update_rules',
+                'netbox rules.update_mirror',
+                'netbox rules.update',
                 'netbox rules',
-                'netbox rules update',
-                'netbox rules.update'
+                'netbox rules_update'
             ];
             $lastResponse = '';
             foreach ($candidates as $cmd) {
-                $response = $backend->configdRun($cmd, false, 300);
-                $res = $this->parseResponse($response);
-                if ($res['status'] === 'ok' && !empty($res['output'])) {
-                    return $res;
+                try {
+                    $response = $backend->configdRun($cmd, false, 300);
+                    $res = $this->parseResponse($response);
+                    if ($res['status'] === 'ok' && !empty($res['output'])) {
+                        return $res;
+                    }
+                    $lastResponse = $response;
+                } catch (\Exception $e) {
+                    $lastResponse = $e->getMessage();
                 }
-                $lastResponse = $response;
             }
             return $this->parseResponse($lastResponse);
         }

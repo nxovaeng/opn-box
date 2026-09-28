@@ -68,6 +68,18 @@ OPNsense 官方源内置了 `security/xray-core`（如 `xray-core-26.7.28_1`）�
 - **根因**：MosDNS 核心引擎在 `coremain/plugin.go` 中使用 `utils.WeakDecode()` 将 YAML 配置转换为插件结构体，其 mapstructure 解码器强制配置了 `TagName: "yaml"` 与 `ErrorUnused: true`。而 `pkg/plugin/pf_alias.go` 中的 `Args` 结构体字段仅声明了 `json:` tag，导致解码器无法识别带下划线的 `socket_path`、`min_ttl`、`max_ttl`，进而被视为非法未知参数并抛出 `FATAL`。
 - **修复**：在 `pkg/plugin/pf_alias.go` 的 `Args` 字段中补全 `yaml:"..."` 标签，并重新为 FreeBSD amd64 编译了内嵌该插件的 `dist/bin/mosdns`。
 
+### 6. Web 界面点击「全量更新规则库」提示异常被拦截，且终端日志被瞬时覆盖
+- **根因**：
+  1. `update_rules.sh` 原先默认 `MIRROR_ENABLED=0`，在未加 `--mirror` 参数时优先直连 GitHub。国内直连 GitHub 经常因阻断或重试导致耗时过长，进而超出 OPNsense 后台 configd 的默认通信超时，返回空或失败。
+  2. `actions_netbox.conf` 与 `actions_mosdns.conf` 中的默认规则更新动作未显式指定 `--mirror`。
+  3. `index.volt` 在动作执行完成后无条件执行 `setTimeout(refreshStatus, 800)`，`refreshStatus()` 强制用套件健康巡检输出覆写了 `#status-terminal`，将实际的规则下载进度日志秒级刷掉。
+  4. 安装阶段出现 `Action not allowed or missing` 是由于 `package_repo.sh` 中 `rc.configure_plugins` 在 `service configd restart` 之前执行，此时 configd 尚未加载新插件的 actions 定义。
+- **修复**：
+  1. `update_rules.sh` 将 CDN 加速通道置为默认 (`MIRROR_ENABLED=1`)，支持 `--no-mirror`，调优连接超时。
+  2. `actions_netbox.conf` 与 `actions_mosdns.conf` 中的所有规则更新指令均显式声明 `--mirror`。
+  3. `index.volt` 重构 `refreshStatus(updateTerminal)`，在动作完成后传入 `false` 仅静默同步徽标状态，坚决保留控制台内原样输出；增加中文友好提示并将 Ajax 超时扩大至 300 秒。
+  4. 优化 `package_repo.sh` post-install 顺序，先重启 configd 再执行 `rc.configure_plugins`。
+
 ---
 
 ## 四、常用终端调试与验证指令

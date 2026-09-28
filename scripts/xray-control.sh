@@ -17,10 +17,10 @@ svc_cmd() {
     act="$2"
     if [ -x "/usr/local/etc/rc.d/${svc}" ]; then
         /usr/local/etc/rc.d/${svc} "one${act}" 2>&1
-    elif service -e | grep -q "${svc}"; then
-        service "${svc}" "one${act}" 2>&1
+    elif [ -x "/etc/rc.d/${svc}" ]; then
+        /etc/rc.d/${svc} "one${act}" 2>&1
     else
-        echo "${svc}: rc.d 脚本未安装"
+        service "${svc}" "one${act}" 2>&1
     fi
 }
 

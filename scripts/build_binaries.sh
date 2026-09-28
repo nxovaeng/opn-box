@@ -198,6 +198,9 @@ fi
 # ------------------------------------------------------------------------------
 mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc" "${WORKSPACE_DIR}/dist/sbin"
 [ -f "${WORKSPACE_DIR}/scripts/update_rules.sh" ] && cp "${WORKSPACE_DIR}/scripts/update_rules.sh" "${WORKSPACE_DIR}/dist/sbin/update-opnbox-rules.sh" && chmod +x "${WORKSPACE_DIR}/dist/sbin/update-opnbox-rules.sh"
+for s in opnbox-control.sh mosdns-control.sh tun2socks-control.sh xray-control.sh; do
+    [ -f "${WORKSPACE_DIR}/scripts/${s}" ] && cp "${WORKSPACE_DIR}/scripts/${s}" "${WORKSPACE_DIR}/dist/sbin/${s%.sh}" && chmod +x "${WORKSPACE_DIR}/dist/sbin/${s%.sh}"
+done
 [ -f "${WORKSPACE_DIR}/rc.d/pf_aliasd" ] && cp "${WORKSPACE_DIR}/rc.d/pf_aliasd" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/mosdns" ] && cp "${WORKSPACE_DIR}/rc.d/mosdns" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/mosdns_controller" ] && cp "${WORKSPACE_DIR}/rc.d/mosdns_controller" "${WORKSPACE_DIR}/dist/rc.d/"
