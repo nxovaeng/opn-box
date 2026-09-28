@@ -438,36 +438,19 @@ EOF
   cat << EOF > /tmp/plist_xray_controller
 bin/xray-controller
 etc/rc.d/xray_controller
-etc/xray/config.json.sample
 EOF
+  [ -f "${STAGE_DIR}/usr/local/etc/xray/config.json.sample" ] && echo "etc/xray/config.json.sample" >> /tmp/plist_xray_controller
+  [ -f "${STAGE_DIR}/usr/local/etc/xray/controller_data.json.sample" ] && echo "etc/xray/controller_data.json.sample" >> /tmp/plist_xray_controller
   pkg create -M /tmp/manifest_xray_controller -p /tmp/plist_xray_controller -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
-# 3.9 Package: xray-core (官方稳定版代理内核，原生支持 xhttp、VLESS 与 SNI 嗅探)
+# 3.9 Xray-core 说明:
+# OPNsense / FreeBSD 官方源已内置发布 security/xray-core (如 xray-core-26.7.28_1)。
+# 本源不再重复打包 xray-core，避免与系统官方内核发生包名/文件冲突。
+# os-xray 插件直接声明依赖官方 security/xray-core。
 # ------------------------------------------------------------------------------
-if [ -f "${STAGE_DIR}/usr/local/bin/xray" ]; then
-  echo "==> 打包 xray-core (官方稳定版, v${XRAY_VERSION})..."
-  cat << EOF > /tmp/manifest_xray
-name: xray-core
-version: "${XRAY_VERSION}"
-origin: security/xray-core
-comment: "Xray-core proxy engine with VLESS, xhttp and sniffing support"
-desc: "Official Xray-core release for OPNsense"
-maintainer: "admin@opn-box.local"
-www: "${PROJECT_WEB_URL}"
-prefix: /usr/local
-categories: [security]
-abi: "FreeBSD:15:amd64"
-arch: "FreeBSD:15:amd64"
-EOF
-  rm -f /tmp/plist_xray
-  [ -f "${STAGE_DIR}/usr/local/bin/xray" ] && echo "bin/xray" >> /tmp/plist_xray
-  [ -f "${STAGE_DIR}/usr/local/share/xray/geoip.dat" ] && echo "share/xray/geoip.dat" >> /tmp/plist_xray
-  [ -f "${STAGE_DIR}/usr/local/share/xray/geosite.dat" ] && echo "share/xray/geosite.dat" >> /tmp/plist_xray
-  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/xray" ] && echo "etc/rc.d/xray" >> /tmp/plist_xray
-  pkg create -M /tmp/manifest_xray -p /tmp/plist_xray -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
-fi
+
 
 # ------------------------------------------------------------------------------
 # 3.10 Package: os-mosdns (OPNsense WebGUI 插件 - DNS 动态分流与守护)
@@ -495,7 +478,7 @@ deps: {
   mosdns-controller: { version: "${BUILD_DATE}", origin: "dns/mosdns-controller" }
 }
 scripts: {
-  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  post-install: "#!/bin/sh\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
   pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF
@@ -528,7 +511,7 @@ deps: {
   hev-controller: { version: "${BUILD_DATE}", origin: "net/hev-controller" }
 }
 scripts: {
-  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  post-install: "#!/bin/sh\n[ -f /usr/local/etc/hev-socks5-tunnel/config.yaml.sample ] && [ ! -f /usr/local/etc/hev-socks5-tunnel/config.yaml ] && cp /usr/local/etc/hev-socks5-tunnel/config.yaml.sample /usr/local/etc/hev-socks5-tunnel/config.yaml || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
   pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF
@@ -557,11 +540,11 @@ categories: [opnsense]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
-  xray-core: { version: "${XRAY_VERSION}", origin: "security/xray-core" },
+  xray-core: { origin: "security/xray-core" },
   xray-controller: { version: "${BUILD_DATE}", origin: "security/xray-controller" }
 }
 scripts: {
-  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  post-install: "#!/bin/sh\n[ -f /usr/local/etc/xray/config.json.sample ] && [ ! -f /usr/local/etc/xray/config.json ] && cp /usr/local/etc/xray/config.json.sample /usr/local/etc/xray/config.json || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
   pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF
@@ -601,7 +584,7 @@ deps: {
   os-xray: { version: "${BUILD_DATE}", origin: "opnsense/os-xray" }
 }
 scripts: {
-  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  post-install: "#!/bin/sh\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\n[ -f /usr/local/etc/hev-socks5-tunnel/config.yaml.sample ] && [ ! -f /usr/local/etc/hev-socks5-tunnel/config.yaml ] && cp /usr/local/etc/hev-socks5-tunnel/config.yaml.sample /usr/local/etc/hev-socks5-tunnel/config.yaml || true\n[ -f /usr/local/etc/xray/config.json.sample ] && [ ! -f /usr/local/etc/xray/config.json ] && cp /usr/local/etc/xray/config.json.sample /usr/local/etc/xray/config.json || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
   pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF

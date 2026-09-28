@@ -27,8 +27,12 @@ start_precmd="xray_prestart"
 xray_prestart()
 {
     if [ ! -f "${xray_config}" ]; then
-        echo "Configuration file ${xray_config} not found!"
-        return 1
+        if [ -f "${xray_config}.sample" ]; then
+            cp "${xray_config}.sample" "${xray_config}"
+        else
+            echo "Configuration file ${xray_config} not found!"
+            return 1
+        fi
     fi
     mkdir -p /var/log /var/run "${xray_datadir}"
     touch "${xray_logfile}"

@@ -17,8 +17,13 @@ load_rc_config $name
 : ${pf_aliasd_gc_interval:="2s"}
 : ${pf_aliasd_batch:="256"}
 : ${pf_aliasd_mode:="0660"}
+: ${pf_aliasd_pidfile:="/var/run/pf-aliasd.pid"}
+: ${pf_aliasd_logfile:="/var/log/pf-aliasd.log"}
 
-command="/usr/local/sbin/pf-aliasd"
-command_args="-socket ${pf_aliasd_socket} -gc ${pf_aliasd_gc_interval} -batch ${pf_aliasd_batch} -mode ${pf_aliasd_mode} > /var/log/pf-aliasd.log 2>&1 &"
+pidfile="${pf_aliasd_pidfile}"
+command="/usr/sbin/daemon"
+procname="/usr/local/sbin/pf-aliasd"
+command_args="-p ${pidfile} -o ${pf_aliasd_logfile} -t ${name} ${procname} -socket ${pf_aliasd_socket} -gc ${pf_aliasd_gc_interval} -batch ${pf_aliasd_batch} -mode ${pf_aliasd_mode}"
 
 run_rc_command "$1"
+

@@ -27,8 +27,12 @@ start_precmd="mosdns_prestart"
 mosdns_prestart()
 {
     if [ ! -f "${mosdns_config}" ]; then
-        echo "Configuration file ${mosdns_config} not found!"
-        return 1
+        if [ -f "${mosdns_config}.sample" ]; then
+            cp "${mosdns_config}.sample" "${mosdns_config}"
+        else
+            echo "Configuration file ${mosdns_config} not found!"
+            return 1
+        fi
     fi
     mkdir -p /var/log /var/run "${mosdns_dir}"
     touch "${mosdns_logfile}"

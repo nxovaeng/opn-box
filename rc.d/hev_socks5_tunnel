@@ -26,10 +26,14 @@ start_precmd="hev_socks5_tunnel_prestart"
 hev_socks5_tunnel_prestart()
 {
     if [ ! -f "${hev_socks5_tunnel_config}" ]; then
-        echo "Configuration file ${hev_socks5_tunnel_config} not found!"
-        return 1
+        if [ -f "${hev_socks5_tunnel_config}.sample" ]; then
+            cp "${hev_socks5_tunnel_config}.sample" "${hev_socks5_tunnel_config}"
+        else
+            echo "Configuration file ${hev_socks5_tunnel_config} not found!"
+            return 1
+        fi
     fi
-    mkdir -p /var/log /var/run
+    mkdir -p /var/log /var/run /usr/local/etc/hev-socks5-tunnel
     touch "${hev_socks5_tunnel_logfile}"
     # Ensure tun kernel module is loaded on FreeBSD
     kldstat -q -m if_tun || kldload if_tun 2>/dev/null || true
