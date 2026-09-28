@@ -23,6 +23,7 @@ procname="/usr/local/bin/mosdns"
 command_args="-p ${pidfile} -o ${mosdns_logfile} -t ${name} ${procname} start -c ${mosdns_config} -d ${mosdns_dir}"
 
 start_precmd="mosdns_prestart"
+stop_cmd="mosdns_stop"
 
 mosdns_prestart()
 {
@@ -36,11 +37,35 @@ mosdns_prestart()
     fi
     mkdir -p /var/log /var/run "${mosdns_dir}" "${mosdns_dir}/rule"
     touch "${mosdns_logfile}"
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && ! kill -0 "${_p}" 2>/dev/null; then
+            rm -f "${pidfile}"
+        fi
+    fi
     # 确保 config.yaml 引用的规则文件存在，避免 domain_set 报 no such file or directory
     [ -f "${mosdns_dir}/rule/cn.txt" ] || touch "${mosdns_dir}/rule/cn.txt"
     [ -f "${mosdns_dir}/rule/gfw.txt" ] || touch "${mosdns_dir}/rule/gfw.txt"
     [ -f "${mosdns_dir}/rule/custom-direct.txt" ] || touch "${mosdns_dir}/rule/custom-direct.txt"
     [ -f "${mosdns_dir}/rule/custom-proxy.txt" ] || touch "${mosdns_dir}/rule/custom-proxy.txt"
+}
+
+mosdns_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && kill -0 "${_p}" 2>/dev/null; then
+            echo "Stopping ${name} (pid ${_p})..."
+            kill -TERM "${_p}" 2>/dev/null
+            for _i in 1 2 3 4 5; do
+                kill -0 "${_p}" 2>/dev/null || break
+                sleep 0.2
+            done
+            kill -0 "${_p}" 2>/dev/null && kill -KILL "${_p}" 2>/dev/null
+        fi
+        rm -f "${pidfile}"
+    fi
+    pkill -KILL -f "${procname}" 2>/dev/null || true
 }
 
 run_rc_command "$1"

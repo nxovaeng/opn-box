@@ -100,6 +100,41 @@ OPNsense 官方源内置了 `security/xray-core`（如 `xray-core-26.7.28_1`）�
      - `os-netbox` 总套件在卸载前执行 `/usr/local/sbin/opnbox-control stop all` 并全面清理全套件孤儿进程。
   2. 若现场已卸载但进程仍驻留，管理员只需在终端执行一次强力终止指令即可彻底清除。
 
+### 10. 服务启停异常与 daemon(8) 孤儿进程残留
+- **根因**：
+  1. FreeBSD 系统通过 `daemon -p <pidfile> -f <binary>` 运行后台微服务时，系统默认的 `stop` 仅向 `daemon` 进程发送 TERM 信号。一旦二进制子进程未能瞬时退出，`daemon` 退出后子进程将脱离监管变成孤儿进程继续霸占端口（5380、5382、5384）。
+  2. 下次执行 `start` 时，旧进程仍占用端口，或残留的死锁 PID 文件导致 `start_precmd` 报错拒绝启动。
+  3. 各微服务控制器内部的 `/api/service` 接口原先只向系统发信号，未核验是否彻底退出即返回，导致前端刷新状态冲突。
+- **修复**：
+  1. 重写所有 `rc.d` 脚本（`hev_controller`, `hev_socks5_tunnel`, `mosdns`, `mosdns_controller`, `pf_aliasd`, `xray_controller`）的 `stop_cmd`：优雅发送 TERM 信号，等待 1 秒核验，若仍驻留则升级为 SIGKILL 强制回收，最后清除 pidfile 并二次核验 `pkill`，确保端口立刻释放；
+  2. 在 `start_precmd` 中加入陈旧死锁 PID 文件的自动识别与清除机制；
+  3. 在 `opnbox-control`、`mosdns-control`、`tun2socks-control`、`xray-control` 以及 Go 控制器主代码中加入进程二次核验与孤儿进程回收，彻底消灭僵尸进程。
+
+### 11. 开机无自启与 OPNsense 启动链路（rc.conf.d + rc.syshook.d + Lobby 注册）
+- **根因**：
+  1. OPNsense 采用微内核 + 事件驱动的引导模型，默认并不会无脑读取 `/etc/rc.conf`，而是通过 `/usr/local/etc/rc.syshook.d/` 钩子与 `configd` 动作调度系统组件；
+  2. 原先未提供 `rc.syshook.d` 脚本，导致机器重启后所有后台组件处于非运行状态；
+  3. OPNsense Lobby 仪表盘与“服务状态”插件未识别到自定义服务，管理员无法在首页直观查看与启停。
+- **修复**：
+  1. **原生 FreeBSD 兼容**：在 `/usr/local/etc/rc.conf.d/` 中为 7 个服务提供默认使能配置（`*_enable="YES"`）；
+  2. **OPNsense 启动钩子**：创建 `/usr/local/etc/rc.syshook.d/`：
+     - `early/10-tun.sh`：早期开机自动装载 `if_tun` 内核驱动；
+     - `start/90-mosdns.sh`、`start/91-tun2socks.sh`、`start/92-xray.sh`、`start/95-netbox.sh`：在网络接口初始化就绪后自动启动对应服务；
+  3. **Lobby 仪表盘服务注册**：在各插件中注入 `/usr/local/etc/inc/plugins.inc.d/*.inc`，注册 `mosdns`、`hev_socks5_tunnel`、`xray` 到 OPNsense 系统服务管理器，支持首页 Widget 状态监视与一键重启。
+
+### 12. 控制面板 Web 页面 HTTPS 协议与证书无法打开问题
+- **根因**：
+  1. OPNsense 管理平台通常开启了 HTTPS 访问，前端页面位于 `https://<opnsense-ip>/`。
+  2. Web 插件通过 `iframe` 内嵌或新标签页打开控制端面板（如 `https://<opnsense-ip>:5380`、`:5382`、`:5384`）。
+  3. 旧版 Controller 为纯 Go `http.ListenAndServe()`，未配置 TLS 证书。浏览器用 HTTPS 发送 TLS ClientHello 握手包（`0x16 0x03 0x01`）到普通 HTTP 端口，触发协议错误（`ERR_SSL_PROTOCOL_ERROR`），页面无法打开。
+  4. OPNsense 自身使用自动生成的自签名证书 `/var/etc/cert.pem`（内含证书与私钥）。若强制只开 HTTPS，则在纯 HTTP 环境下或内网未信任证书时又会出现安全告警或访问受限。
+- **修复**：
+  1. 自研通用双协议监听器 `pkg/httpserver/server.go`：
+     - **同端口协议自适应**：在同一个端口（5380/5382/5384）上，监听器通过预读首字节（Peek 1 字节）实现协议嗅探。若收到 `0x16`（TLS 握手特征），自动走 TLS 处理管道；若收到 ASCII 字符（HTTP `GET`/`POST` 等），直接走明文 HTTP 处理管道。
+     - **OPNsense 自签证书自动加载**：默认探测并加载 OPNsense 主证书 `/var/etc/cert.pem`。支持动态热重载：文件修改时间变化时秒级更新证书，无需重启进程。若系统证书不存在，自动生成高兼容性内存临时自签名证书作为兜底。
+     - **跨域与内嵌优化**：统一注入宽松的 `X-Frame-Options: SAMEORIGIN` 与 CORS 响应头，确保 OPNsense WebGUI 的 `<iframe>` 无缝内嵌展示。
+  2. 三大 Controller 二进制（`hev-controller`, `mosdns-controller`, `xray-controller`）全部升级接入该监听器，并提供 `-tls-cert` 与 `-tls-key` 启动参数。
+
 ---
 
 ## 四、常用终端调试与验证指令

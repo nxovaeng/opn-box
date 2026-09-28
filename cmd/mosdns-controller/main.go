@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"opn-box/pkg/httpserver"
 )
 
 // ControllerSettings holds the user-configurable routing logic
@@ -63,6 +65,8 @@ var (
 	aliasLogFile string
 	rcService    string
 	aliasService string
+	tlsCertFile  string
+	tlsKeyFile   string
 	mu           sync.Mutex
 )
 
@@ -93,6 +97,8 @@ func main() {
 	flag.StringVar(&aliasLogFile, "alias-log", "/var/log/pf-aliasd.log", "Path to pf-aliasd log file")
 	flag.StringVar(&rcService, "rc-service", "mosdns", "FreeBSD rc.d service name for mosdns")
 	flag.StringVar(&aliasService, "alias-service", "pf_aliasd", "FreeBSD rc.d service name for pf_aliasd")
+	flag.StringVar(&tlsCertFile, "tls-cert", "/var/etc/cert.pem", "Path to TLS certificate PEM (defaults to OPNsense /var/etc/cert.pem)")
+	flag.StringVar(&tlsKeyFile, "tls-key", "/var/etc/cert.pem", "Path to TLS private key PEM")
 	flag.Parse()
 
 	// Ensure directories and initial rule files exist
@@ -117,7 +123,14 @@ func main() {
 
 	log.Printf("[mosdns-controller] Starting MosDNS Web Manager on %s", listenAddr)
 	log.Printf("[mosdns-controller] Target config: %s, rule dir: %s", configFile, ruleDir)
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
+
+	srvCfg := httpserver.Config{
+		ListenAddr:  listenAddr,
+		TLSCertFile: tlsCertFile,
+		TLSKeyFile:  tlsKeyFile,
+		ServiceName: "mosdns-controller",
+	}
+	if err := httpserver.ListenAndServeDual(srvCfg, http.DefaultServeMux); err != nil {
 		log.Fatalf("[mosdns-controller] Failed to start server: %v", err)
 	}
 }
@@ -606,7 +619,9 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 
 		msg := "配置已保存并重新生成 config.yaml"
 		if req.Restart {
-			_ = exec.Command("service", rcService, "restart").Run()
+			_ = exec.Command("service", rcService, "onerestart").Run()
+			rcPath := fmt.Sprintf("/usr/local/etc/rc.d/%s", rcService)
+			_ = exec.Command(rcPath, "onerestart").Run()
 			msg += "，已重启 MosDNS 服务"
 		}
 
@@ -646,14 +661,18 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 		services = []string{rcService}
 	}
 
+	actualAction := "one" + req.Action
+	if req.Action == "status" {
+		actualAction = "onestatus"
+	}
 	var outBuf bytes.Buffer
 	allSuccess := true
 	for _, s := range services {
-		cmd := exec.Command("service", s, req.Action)
+		cmd := exec.Command("service", s, actualAction)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			rcPath := fmt.Sprintf("/usr/local/etc/rc.d/%s", s)
-			cmd = exec.Command(rcPath, req.Action)
+			cmd = exec.Command(rcPath, actualAction)
 			out, err = cmd.CombinedOutput()
 		}
 		outBuf.WriteString(fmt.Sprintf("[%s %s]\n%s\n", s, req.Action, string(out)))
@@ -663,6 +682,19 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	time.Sleep(300 * time.Millisecond)
+	if req.Action == "stop" {
+		for _, s := range services {
+			proc := s
+			if s == "mosdns" {
+				proc = "mosdns"
+			} else if s == "pf_aliasd" {
+				proc = "pf-aliasd"
+			}
+			if getPID(proc) > 0 {
+				_ = exec.Command("pkill", "-KILL", "-x", proc).Run()
+			}
+		}
+	}
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": allSuccess,
 		"output":  outBuf.String(),
@@ -765,7 +797,9 @@ func handleRules(w http.ResponseWriter, r *http.Request) {
 
 		if req.Reload {
 			// Reload mosdns
-			_ = exec.Command("service", rcService, "restart").Run()
+			_ = exec.Command("service", rcService, "onerestart").Run()
+			rcPath := fmt.Sprintf("/usr/local/etc/rc.d/%s", rcService)
+			_ = exec.Command(rcPath, "onerestart").Run()
 		}
 
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{

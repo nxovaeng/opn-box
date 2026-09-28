@@ -1,0 +1,4 @@
+xray_enable="YES"
+xray_flags="-confdir /usr/local/etc/xray-core"
+xray_confdir="/usr/local/etc/xray-core"
+xray_config="/usr/local/etc/xray-core/config.json"

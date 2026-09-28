@@ -17,6 +17,16 @@ pre_check() {
         fi
     done
     [ -f /usr/local/etc/mosdns/config.yaml ] || [ ! -f /usr/local/etc/mosdns/config.yaml.sample ] || cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml
+
+    # 确保清理可能残留的失效 PID 锁文件
+    for pf in /var/run/pf-aliasd.pid /var/run/mosdns.pid /var/run/mosdns-controller.pid; do
+        if [ -f "$pf" ]; then
+            p=$(cat "$pf" 2>/dev/null)
+            if [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; then
+                rm -f "$pf"
+            fi
+        fi
+    done
 }
 
 svc_cmd() {
@@ -44,6 +54,14 @@ case "${ACTION}" in
         for s in mosdns_controller mosdns pf_aliasd; do
             svc_cmd "${s}" stop
         done
+        # 二次核验，确保守护进程彻底退出以释放端口与 PF 套接字
+        sleep 0.5
+        for proc in mosdns-controller mosdns pf-aliasd; do
+            if pgrep -x "${proc}" >/dev/null 2>&1; then
+                pkill -KILL -x "${proc}" 2>/dev/null || true
+            fi
+        done
+        rm -f /var/run/pf-aliasd.pid /var/run/mosdns.pid /var/run/mosdns-controller.pid 2>/dev/null || true
         ;;
     restart)
         $0 stop

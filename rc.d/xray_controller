@@ -17,20 +17,46 @@ load_rc_config $name
 : ${xray_controller_data:="/usr/local/etc/xray-core/controller_data.json"}
 : ${xray_controller_logfile:="/var/log/xray-controller.log"}
 : ${xray_controller_pidfile:="/var/run/xray-controller.pid"}
+: ${xray_controller_tls_cert:="/var/etc/cert.pem"}
+: ${xray_controller_tls_key:="/var/etc/cert.pem"}
 
 pidfile="${xray_controller_pidfile}"
 command="/usr/sbin/daemon"
 procname="/usr/local/bin/xray-controller"
-command_args="-p ${pidfile} -o ${xray_controller_logfile} -t ${name} ${procname} -listen ${xray_controller_listen} -confdir ${xray_controller_confdir} -data ${xray_controller_data}"
+command_args="-p ${pidfile} -o ${xray_controller_logfile} -t ${name} ${procname} -listen ${xray_controller_listen} -confdir ${xray_controller_confdir} -data ${xray_controller_data} -tls-cert ${xray_controller_tls_cert} -tls-key ${xray_controller_tls_key}"
 
 start_precmd="xray_controller_prestart"
+stop_cmd="xray_controller_stop"
 
 xray_controller_prestart()
 {
     mkdir -p /var/log /var/run "${xray_controller_confdir}"
     [ -f "${xray_controller_data}" ] || [ ! -f "${xray_controller_data}.sample" ] || cp "${xray_controller_data}.sample" "${xray_controller_data}"
     touch "${xray_controller_logfile}"
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && ! kill -0 "${_p}" 2>/dev/null; then
+            rm -f "${pidfile}"
+        fi
+    fi
+}
+
+xray_controller_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && kill -0 "${_p}" 2>/dev/null; then
+            echo "Stopping ${name} (pid ${_p})..."
+            kill -TERM "${_p}" 2>/dev/null
+            for _i in 1 2 3 4 5; do
+                kill -0 "${_p}" 2>/dev/null || break
+                sleep 0.2
+            done
+            kill -0 "${_p}" 2>/dev/null && kill -KILL "${_p}" 2>/dev/null
+        fi
+        rm -f "${pidfile}"
+    fi
+    pkill -KILL -f "${procname}" 2>/dev/null || true
 }
 
 run_rc_command "$1"
-

@@ -16,19 +16,45 @@ load_rc_config $name
 : ${hev_controller_config:="/usr/local/etc/hev-socks5-tunnel/config.yaml"}
 : ${hev_controller_logfile:="/var/log/hev-controller.log"}
 : ${hev_controller_pidfile:="/var/run/hev-controller.pid"}
+: ${hev_controller_tls_cert:="/var/etc/cert.pem"}
+: ${hev_controller_tls_key:="/var/etc/cert.pem"}
 
 pidfile="${hev_controller_pidfile}"
 command="/usr/sbin/daemon"
 procname="/usr/local/bin/hev-controller"
-command_args="-p ${pidfile} -o ${hev_controller_logfile} -t ${name} ${procname} -listen ${hev_controller_listen} -config ${hev_controller_config}"
+command_args="-p ${pidfile} -o ${hev_controller_logfile} -t ${name} ${procname} -listen ${hev_controller_listen} -config ${hev_controller_config} -tls-cert ${hev_controller_tls_cert} -tls-key ${hev_controller_tls_key}"
 
 start_precmd="hev_controller_prestart"
+stop_cmd="hev_controller_stop"
 
 hev_controller_prestart()
 {
     mkdir -p /var/log /var/run
     touch "${hev_controller_logfile}"
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && ! kill -0 "${_p}" 2>/dev/null; then
+            rm -f "${pidfile}"
+        fi
+    fi
+}
+
+hev_controller_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && kill -0 "${_p}" 2>/dev/null; then
+            echo "Stopping ${name} (pid ${_p})..."
+            kill -TERM "${_p}" 2>/dev/null
+            for _i in 1 2 3 4 5; do
+                kill -0 "${_p}" 2>/dev/null || break
+                sleep 0.2
+            done
+            kill -0 "${_p}" 2>/dev/null && kill -KILL "${_p}" 2>/dev/null
+        fi
+        rm -f "${pidfile}"
+    fi
+    pkill -KILL -f "${procname}" 2>/dev/null || true
 }
 
 run_rc_command "$1"
-

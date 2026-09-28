@@ -25,5 +25,38 @@ command="/usr/sbin/daemon"
 procname="/usr/local/sbin/pf-aliasd"
 command_args="-p ${pidfile} -o ${pf_aliasd_logfile} -t ${name} ${procname} -socket ${pf_aliasd_socket} -gc ${pf_aliasd_gc_interval} -batch ${pf_aliasd_batch} -mode ${pf_aliasd_mode}"
 
-run_rc_command "$1"
+start_precmd="pf_aliasd_prestart"
+stop_cmd="pf_aliasd_stop"
 
+pf_aliasd_prestart()
+{
+    mkdir -p /var/log /var/run
+    touch "${pf_aliasd_logfile}"
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && ! kill -0 "${_p}" 2>/dev/null; then
+            rm -f "${pidfile}"
+        fi
+    fi
+}
+
+pf_aliasd_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && kill -0 "${_p}" 2>/dev/null; then
+            echo "Stopping ${name} (pid ${_p})..."
+            kill -TERM "${_p}" 2>/dev/null
+            for _i in 1 2 3 4 5; do
+                kill -0 "${_p}" 2>/dev/null || break
+                sleep 0.2
+            done
+            kill -0 "${_p}" 2>/dev/null && kill -KILL "${_p}" 2>/dev/null
+        fi
+        rm -f "${pidfile}"
+    fi
+    pkill -KILL -f "${procname}" 2>/dev/null || true
+    rm -f "${pf_aliasd_socket}"
+}
+
+run_rc_command "$1"

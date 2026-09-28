@@ -18,18 +18,45 @@ load_rc_config $name
 : ${mosdns_controller_ruledir:="/usr/local/etc/mosdns/rule"}
 : ${mosdns_controller_logfile:="/var/log/mosdns-controller.log"}
 : ${mosdns_controller_pidfile:="/var/run/mosdns-controller.pid"}
+: ${mosdns_controller_tls_cert:="/var/etc/cert.pem"}
+: ${mosdns_controller_tls_key:="/var/etc/cert.pem"}
 
 pidfile="${mosdns_controller_pidfile}"
 command="/usr/sbin/daemon"
 procname="/usr/local/bin/mosdns-controller"
-command_args="-p ${pidfile} -o ${mosdns_controller_logfile} -t ${name} ${procname} -listen ${mosdns_controller_listen} -config ${mosdns_controller_config} -settings ${mosdns_controller_settings} -rule-dir ${mosdns_controller_ruledir}"
+command_args="-p ${pidfile} -o ${mosdns_controller_logfile} -t ${name} ${procname} -listen ${mosdns_controller_listen} -config ${mosdns_controller_config} -settings ${mosdns_controller_settings} -rule-dir ${mosdns_controller_ruledir} -tls-cert ${mosdns_controller_tls_cert} -tls-key ${mosdns_controller_tls_key}"
 
 start_precmd="mosdns_controller_prestart"
+stop_cmd="mosdns_controller_stop"
 
 mosdns_controller_prestart()
 {
     mkdir -p /var/log /var/run /usr/local/etc/mosdns "${mosdns_controller_ruledir}"
     touch "${mosdns_controller_logfile}"
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && ! kill -0 "${_p}" 2>/dev/null; then
+            rm -f "${pidfile}"
+        fi
+    fi
+}
+
+mosdns_controller_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && kill -0 "${_p}" 2>/dev/null; then
+            echo "Stopping ${name} (pid ${_p})..."
+            kill -TERM "${_p}" 2>/dev/null
+            for _i in 1 2 3 4 5; do
+                kill -0 "${_p}" 2>/dev/null || break
+                sleep 0.2
+            done
+            kill -0 "${_p}" 2>/dev/null && kill -KILL "${_p}" 2>/dev/null
+        fi
+        rm -f "${pidfile}"
+    fi
+    pkill -KILL -f "${procname}" 2>/dev/null || true
 }
 
 run_rc_command "$1"

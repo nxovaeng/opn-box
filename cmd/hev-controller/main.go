@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"opn-box/pkg/httpserver"
 )
 
 // HevConfig represents the hev-socks5-tunnel configuration schema
@@ -51,11 +53,13 @@ type MiscSection struct {
 }
 
 var (
-	configFile string
-	logFile    string
-	rcService  string
-	listenAddr string
-	mu         sync.Mutex
+	configFile  string
+	logFile     string
+	rcService   string
+	listenAddr  string
+	tlsCertFile string
+	tlsKeyFile  string
+	mu          sync.Mutex
 )
 
 func main() {
@@ -63,6 +67,8 @@ func main() {
 	flag.StringVar(&configFile, "config", "/usr/local/etc/hev-socks5-tunnel/config.yaml", "Path to hev-socks5-tunnel config.yaml")
 	flag.StringVar(&logFile, "log-file", "/var/log/hev-socks5-tunnel.log", "Path to hev-socks5-tunnel log file")
 	flag.StringVar(&rcService, "rc-service", "hev_socks5_tunnel", "FreeBSD rc.d service name")
+	flag.StringVar(&tlsCertFile, "tls-cert", "/var/etc/cert.pem", "Path to TLS certificate PEM (defaults to OPNsense /var/etc/cert.pem)")
+	flag.StringVar(&tlsKeyFile, "tls-key", "/var/etc/cert.pem", "Path to TLS private key PEM")
 	flag.Parse()
 
 	http.HandleFunc("/", handleIndex)
@@ -73,7 +79,14 @@ func main() {
 
 	log.Printf("[hev-controller] Starting Tun2Socks Web Manager on %s", listenAddr)
 	log.Printf("[hev-controller] Target config: %s, log: %s", configFile, logFile)
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
+
+	srvCfg := httpserver.Config{
+		ListenAddr:  listenAddr,
+		TLSCertFile: tlsCertFile,
+		TLSKeyFile:  tlsKeyFile,
+		ServiceName: "hev-controller",
+	}
+	if err := httpserver.ListenAndServeDual(srvCfg, http.DefaultServeMux); err != nil {
 		log.Fatalf("[hev-controller] Failed to start server: %v", err)
 	}
 }
@@ -234,6 +247,15 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 
 	time.Sleep(300 * time.Millisecond)
 	pid := getPID()
+	if req.Action == "stop" && pid > 0 {
+		time.Sleep(300 * time.Millisecond)
+		pid = getPID()
+		if pid > 0 {
+			_ = exec.Command("pkill", "-KILL", "-x", "hev-socks5-tunnel").Run()
+			time.Sleep(200 * time.Millisecond)
+			pid = getPID()
+		}
+	}
 
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": err == nil,

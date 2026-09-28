@@ -2,7 +2,7 @@
 # ==============================================================================
 # opnbox-control - NetBox Suite 全套件统一控制与巡检脚本
 # 作用: 供 OPNsense configd (actions_netbox.conf) 及系统管理员命令行调用
-# 语法: opnbox-control {start|stop|restart|status} [all|mosdns|tun2socks|xray]
+# 语法: opnbox-control {start|stop|restart|status} [all|mosdns|tun2socks|xray|<service>]
 # ==============================================================================
 
 ACTION="$1"
@@ -10,6 +10,9 @@ TARGET="${2:-all}"
 
 START_ORDER="pf_aliasd mosdns mosdns_controller hev_socks5_tunnel hev_controller xray xray_controller"
 STOP_ORDER="xray_controller xray hev_controller hev_socks5_tunnel mosdns_controller mosdns pf_aliasd"
+
+ALL_PIDFILES="/var/run/pf-aliasd.pid /var/run/mosdns.pid /var/run/mosdns-controller.pid /var/run/hev-socks5-tunnel.pid /var/run/hev-controller.pid /var/run/xray.pid /var/run/xray-controller.pid"
+ALL_PROCS="xray-controller xray hev-controller hev-socks5-tunnel mosdns-controller mosdns pf-aliasd"
 
 pre_check() {
     # 1. 确保日志与运行目录存在
@@ -20,10 +23,9 @@ pre_check() {
              /usr/local/share/xray-core \
              /usr/local/share/xray 2>/dev/null || true
 
-    # 2. 兼容软链接 /usr/local/share/xray -> /usr/local/share/xray-core
-    if [ ! -d /usr/local/share/xray-core ]; then
-        mkdir -p /usr/local/share/xray-core
-    fi
+    # 2. 兼容软链接 /usr/local/share/xray -> /usr/local/share/xray-core 与 /usr/local/etc/xray -> /usr/local/etc/xray-core
+    [ -d /usr/local/share/xray-core ] || mkdir -p /usr/local/share/xray-core
+    [ -L /usr/local/etc/xray ] || [ -d /usr/local/etc/xray ] || ln -s /usr/local/etc/xray-core /usr/local/etc/xray 2>/dev/null || true
 
     # 3. 确保 MosDNS 所需的基础规则文件存在且非空，防止 MosDNS 初始化 domain_set 致命报错
     for r in cn.txt gfw.txt custom-direct.txt custom-proxy.txt; do
@@ -44,8 +46,25 @@ pre_check() {
     [ -f /usr/local/etc/hev-socks5-tunnel/config.yaml ] || [ ! -f /usr/local/etc/hev-socks5-tunnel/config.yaml.sample ] || cp /usr/local/etc/hev-socks5-tunnel/config.yaml.sample /usr/local/etc/hev-socks5-tunnel/config.yaml
     [ -f /usr/local/etc/xray-core/controller_data.json ] || [ ! -f /usr/local/etc/xray-core/controller_data.json.sample ] || cp /usr/local/etc/xray-core/controller_data.json.sample /usr/local/etc/xray-core/controller_data.json
 
+    # 确保 Xray 初始配置存在，避免官方 rc.d/xray 启动报错
+    if [ ! -f /usr/local/etc/xray-core/config.json ] && [ ! -f /usr/local/etc/xray-core/00_log.json ]; then
+        if [ -f /usr/local/etc/xray-core/config.json.sample ]; then
+            cp /usr/local/etc/xray-core/config.json.sample /usr/local/etc/xray-core/config.json
+        fi
+    fi
+
     # 5. 确保 tun 虚拟网卡驱动内核模块已载入
     kldstat -q -m if_tun || kldload if_tun 2>/dev/null || true
+
+    # 6. 清理可能残留的死锁 PID 文件
+    for pf in ${ALL_PIDFILES}; do
+        if [ -f "$pf" ]; then
+            p=$(cat "$pf" 2>/dev/null)
+            if [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; then
+                rm -f "$pf"
+            fi
+        fi
+    done
 }
 
 svc_cmd() {
@@ -103,6 +122,14 @@ do_stop() {
                 res=$(svc_cmd "${s}" stop)
                 echo "${res}"
             done
+            # 二次核验所有守护进程并清除孤儿残留
+            sleep 0.5
+            for proc in ${ALL_PROCS}; do
+                if pgrep -x "${proc}" >/dev/null 2>&1; then
+                    pkill -KILL -x "${proc}" 2>/dev/null || true
+                fi
+            done
+            rm -f ${ALL_PIDFILES} 2>/dev/null || true
             echo "==> 停止完毕，当前全套件健康状态："
             do_status all
             ;;
@@ -110,16 +137,31 @@ do_stop() {
             for s in mosdns_controller mosdns pf_aliasd; do
                 svc_cmd "${s}" stop
             done
+            sleep 0.5
+            for proc in mosdns-controller mosdns pf-aliasd; do
+                pgrep -x "${proc}" >/dev/null 2>&1 && pkill -KILL -x "${proc}" 2>/dev/null || true
+            done
+            rm -f /var/run/pf-aliasd.pid /var/run/mosdns.pid /var/run/mosdns-controller.pid 2>/dev/null || true
             ;;
         tun2socks|hev)
             for s in hev_controller hev_socks5_tunnel; do
                 svc_cmd "${s}" stop
             done
+            sleep 0.5
+            for proc in hev-controller hev-socks5-tunnel; do
+                pgrep -x "${proc}" >/dev/null 2>&1 && pkill -KILL -x "${proc}" 2>/dev/null || true
+            done
+            rm -f /var/run/hev-socks5-tunnel.pid /var/run/hev-controller.pid 2>/dev/null || true
             ;;
         xray)
             for s in xray_controller xray; do
                 svc_cmd "${s}" stop
             done
+            sleep 0.5
+            for proc in xray-controller xray; do
+                pgrep -x "${proc}" >/dev/null 2>&1 && pkill -KILL -x "${proc}" 2>/dev/null || true
+            done
+            rm -f /var/run/xray.pid /var/run/xray-controller.pid 2>/dev/null || true
             ;;
         *)
             svc_cmd "$1" stop

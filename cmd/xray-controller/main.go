@@ -19,17 +19,21 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"opn-box/pkg/httpserver"
 )
 
 var (
-	listenAddr string
-	confDir    string
-	configFile string
-	dataFile   string
-	logFile    string
-	rcService  string
-	xrayBin    string
-	mu         sync.Mutex
+	listenAddr  string
+	confDir     string
+	configFile  string
+	dataFile    string
+	logFile     string
+	rcService   string
+	xrayBin     string
+	tlsCertFile string
+	tlsKeyFile  string
+	mu          sync.Mutex
 )
 
 // AppData persists controller state (nodes, inbounds, rules, subscriptions)
@@ -97,6 +101,8 @@ func main() {
 	flag.StringVar(&logFile, "log-file", "/var/log/xray.log", "Path to xray log file")
 	flag.StringVar(&rcService, "rc-service", "xray", "FreeBSD rc.d service name")
 	flag.StringVar(&xrayBin, "xray-bin", "/usr/local/bin/xray", "Path to xray binary")
+	flag.StringVar(&tlsCertFile, "tls-cert", "/var/etc/cert.pem", "Path to TLS certificate PEM (defaults to OPNsense /var/etc/cert.pem)")
+	flag.StringVar(&tlsKeyFile, "tls-key", "/var/etc/cert.pem", "Path to TLS private key PEM")
 	flag.Parse()
 
 	http.HandleFunc("/", handleIndex)
@@ -118,7 +124,14 @@ func main() {
 
 	log.Printf("[xray-controller] Starting Xray Manager on %s", listenAddr)
 	log.Printf("[xray-controller] Target confdir: %s, data: %s", confDir, dataFile)
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
+
+	srvCfg := httpserver.Config{
+		ListenAddr:  listenAddr,
+		TLSCertFile: tlsCertFile,
+		TLSKeyFile:  tlsKeyFile,
+		ServiceName: "xray-controller",
+	}
+	if err := httpserver.ListenAndServeDual(srvCfg, http.DefaultServeMux); err != nil {
 		log.Fatalf("[xray-controller] Failed to start server: %v", err)
 	}
 }
@@ -289,6 +302,15 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 
 	time.Sleep(400 * time.Millisecond)
 	pid := getPID()
+	if req.Action == "stop" && pid > 0 {
+		time.Sleep(300 * time.Millisecond)
+		pid = getPID()
+		if pid > 0 {
+			_ = exec.Command("pkill", "-KILL", "-x", "xray").Run()
+			time.Sleep(200 * time.Millisecond)
+			pid = getPID()
+		}
+	}
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": err == nil,
 		"output":  string(out),
@@ -1298,6 +1320,11 @@ func handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 			"error":   fmt.Sprintf("Xray 语法预检失败 (-confdir %s):\n%s", confDir, string(out)),
 		})
 		return
+	}
+
+	// Ensure compatibility symlink /usr/local/etc/xray -> confDir
+	if _, err := os.Lstat("/usr/local/etc/xray"); err != nil {
+		_ = os.Symlink(confDir, "/usr/local/etc/xray")
 	}
 
 	// 6. Restart service using onerestart

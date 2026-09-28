@@ -22,6 +22,7 @@ procname="/usr/local/bin/hev-socks5-tunnel"
 command_args="-p ${pidfile} -o ${hev_socks5_tunnel_logfile} -t ${name} ${procname} ${hev_socks5_tunnel_config}"
 
 start_precmd="hev_socks5_tunnel_prestart"
+stop_cmd="hev_socks5_tunnel_stop"
 
 hev_socks5_tunnel_prestart()
 {
@@ -35,9 +36,32 @@ hev_socks5_tunnel_prestart()
     fi
     mkdir -p /var/log /var/run /usr/local/etc/hev-socks5-tunnel
     touch "${hev_socks5_tunnel_logfile}"
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && ! kill -0 "${_p}" 2>/dev/null; then
+            rm -f "${pidfile}"
+        fi
+    fi
     # Ensure tun kernel module is loaded on FreeBSD
     kldstat -q -m if_tun || kldload if_tun 2>/dev/null || true
 }
 
-run_rc_command "$1"
+hev_socks5_tunnel_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        _p=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_p}" ] && kill -0 "${_p}" 2>/dev/null; then
+            echo "Stopping ${name} (pid ${_p})..."
+            kill -TERM "${_p}" 2>/dev/null
+            for _i in 1 2 3 4 5; do
+                kill -0 "${_p}" 2>/dev/null || break
+                sleep 0.2
+            done
+            kill -0 "${_p}" 2>/dev/null && kill -KILL "${_p}" 2>/dev/null
+        fi
+        rm -f "${pidfile}"
+    fi
+    pkill -KILL -f "${procname}" 2>/dev/null || true
+}
 
+run_rc_command "$1"
