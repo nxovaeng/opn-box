@@ -27,12 +27,12 @@ func init() {
 
 // Args configures the pf_alias plugin
 type Args struct {
-	SocketPath string `json:"socket_path"` // Unix domain socket path (default: /var/run/pf-aliasd.sock)
-	Table      string `json:"table"`       // Target PF Table name (OPNsense External Alias)
-	MinTTL     uint32 `json:"min_ttl"`     // Minimum clamped TTL in seconds (default: 60)
-	MaxTTL     uint32 `json:"max_ttl"`     // Maximum clamped TTL in seconds (default: 86400)
-	Timeout    string `json:"timeout"`     // Wait timeout for ACK (default: "100ms")
-	Sync       bool   `json:"sync"`        // Wait synchronously for ACK (default: true)
+	SocketPath string `yaml:"socket_path" json:"socket_path"` // Unix domain socket path (default: /var/run/pf-aliasd.sock)
+	Table      string `yaml:"table" json:"table"`             // Target PF Table name (OPNsense External Alias)
+	MinTTL     uint32 `yaml:"min_ttl" json:"min_ttl"`         // Minimum clamped TTL in seconds (default: 60)
+	MaxTTL     uint32 `yaml:"max_ttl" json:"max_ttl"`         // Maximum clamped TTL in seconds (default: 86400)
+	Timeout    string `yaml:"timeout" json:"timeout"`         // Wait timeout for ACK (default: "100ms")
+	Sync       bool   `yaml:"sync" json:"sync"`               // Wait synchronously for ACK (default: true)
 }
 
 // QuickSetup enables shorthand configuration in MosDNS sequence (e.g. `exec: pf_alias gfw_proxy`)

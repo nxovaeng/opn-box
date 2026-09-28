@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
+	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 
@@ -125,5 +126,38 @@ func TestPFAliasPluginExec(t *testing.T) {
 		t.Error("Expected no new message due to local cache deduplication")
 	case <-time.After(100 * time.Millisecond):
 		// Success: cached
+	}
+}
+
+func TestWeakDecode(t *testing.T) {
+	args := new(Args)
+	in := map[string]interface{}{
+		"socket_path": "/var/run/pf-aliasd.sock",
+		"table":       "GFW_Proxy",
+		"min_ttl":     60,
+		"max_ttl":     86400,
+		"timeout":     "100ms",
+		"sync":        true,
+	}
+	if err := utils.WeakDecode(in, args); err != nil {
+		t.Fatalf("WeakDecode failed: %v", err)
+	}
+	if args.SocketPath != "/var/run/pf-aliasd.sock" {
+		t.Errorf("Expected SocketPath '/var/run/pf-aliasd.sock', got '%s'", args.SocketPath)
+	}
+	if args.Table != "GFW_Proxy" {
+		t.Errorf("Expected Table 'GFW_Proxy', got '%s'", args.Table)
+	}
+	if args.MinTTL != 60 {
+		t.Errorf("Expected MinTTL 60, got %d", args.MinTTL)
+	}
+	if args.MaxTTL != 86400 {
+		t.Errorf("Expected MaxTTL 86400, got %d", args.MaxTTL)
+	}
+	if args.Timeout != "100ms" {
+		t.Errorf("Expected Timeout '100ms', got '%s'", args.Timeout)
+	}
+	if !args.Sync {
+		t.Errorf("Expected Sync true, got false")
 	}
 }
