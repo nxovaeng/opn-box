@@ -64,6 +64,10 @@ OPNsense 官方源内置了 `security/xray-core`（如 `xray-core-26.7.28_1`）�
   1. 移除 `set -e`，改用多 CDN（jsDelivr CDN、ghproxy、GitHub 原源）轮询降级机制；
   2. 无论网络下载是否成功，自动为 `cn.txt`、`gfw.txt`、`custom-direct.txt`、`custom-proxy.txt` 生成合法的非空占位记录，保证 MosDNS 100% 正常启动。
 
+### 5. MosDNS 报错 `failed to init plugin #4 sync_to_pf, unable to decode plugin args: * '' has invalid keys: max_ttl, min_ttl, socket_path`
+- **根因**：MosDNS 核心引擎在 `coremain/plugin.go` 中使用 `utils.WeakDecode()` 将 YAML 配置转换为插件结构体，其 mapstructure 解码器强制配置了 `TagName: "yaml"` 与 `ErrorUnused: true`。而 `pkg/plugin/pf_alias.go` 中的 `Args` 结构体字段仅声明了 `json:` tag，导致解码器无法识别带下划线的 `socket_path`、`min_ttl`、`max_ttl`，进而被视为非法未知参数并抛出 `FATAL`。
+- **修复**：在 `pkg/plugin/pf_alias.go` 的 `Args` 字段中补全 `yaml:"..."` 标签，并重新为 FreeBSD amd64 编译了内嵌该插件的 `dist/bin/mosdns`。
+
 ---
 
 ## 四、常用终端调试与验证指令
