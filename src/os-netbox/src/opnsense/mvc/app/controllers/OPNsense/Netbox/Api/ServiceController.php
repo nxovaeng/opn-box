@@ -64,8 +64,22 @@ class ServiceController extends ApiControllerBase
     {
         if ($this->request->isPost()) {
             $backend = new Backend();
-            $response = $backend->configdRun('netbox rules.update');
-            return $this->parseResponse($response);
+            $candidates = [
+                'netbox update_rules',
+                'netbox rules',
+                'netbox rules update',
+                'netbox rules.update'
+            ];
+            $lastResponse = '';
+            foreach ($candidates as $cmd) {
+                $response = $backend->configdRun($cmd, false, 300);
+                $res = $this->parseResponse($response);
+                if ($res['status'] === 'ok' && !empty($res['output'])) {
+                    return $res;
+                }
+                $lastResponse = $response;
+            }
+            return $this->parseResponse($lastResponse);
         }
         return ['status' => 'failed', 'output' => 'Invalid request method'];
     }
