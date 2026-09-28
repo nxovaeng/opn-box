@@ -463,13 +463,13 @@ if [ -d "${WORKSPACE_DIR}/src/os-mosdns/src" ]; then
   cat << EOF > /tmp/manifest_os_mosdns
 name: os-mosdns
 version: "${BUILD_DATE}"
-origin: opnsense/os-mosdns
+origin: dns/os-mosdns
 comment: "MosDNS Dynamic Routing Engine with pf-aliasd & Controller UI"
 desc: "OPNsense WebGUI plugin for MosDNS with pf-aliasd"
 maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
-categories: [opnsense]
+categories: [dns]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
@@ -478,7 +478,7 @@ deps: {
   mosdns-controller: { version: "${BUILD_DATE}", origin: "dns/mosdns-controller" }
 }
 scripts: {
-  post-install: "#!/bin/sh\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  post-install: "#!/bin/sh\nmkdir -p /usr/local/etc/mosdns/rule\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\n[ -f /usr/local/etc/mosdns/rule/cn.txt ] || touch /usr/local/etc/mosdns/rule/cn.txt || true\n[ -f /usr/local/etc/mosdns/rule/gfw.txt ] || touch /usr/local/etc/mosdns/rule/gfw.txt || true\n[ -f /usr/local/etc/mosdns/rule/custom-direct.txt ] || touch /usr/local/etc/mosdns/rule/custom-direct.txt || true\n[ -f /usr/local/etc/mosdns/rule/custom-proxy.txt ] || touch /usr/local/etc/mosdns/rule/custom-proxy.txt || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
   pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF
@@ -497,13 +497,13 @@ if [ -d "${WORKSPACE_DIR}/src/os-tun2socks/src" ]; then
   cat << EOF > /tmp/manifest_os_tun2socks
 name: os-tun2socks
 version: "${BUILD_DATE}"
-origin: opnsense/os-tun2socks
+origin: net/os-tun2socks
 comment: "Tun2Socks High-Performance Bridge with Web UI Manager"
 desc: "OPNsense WebGUI plugin for hev-socks5-tunnel Tun2Socks bridge"
 maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
-categories: [opnsense]
+categories: [net]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
@@ -530,13 +530,13 @@ if [ -d "${WORKSPACE_DIR}/src/os-xray/src" ]; then
   cat << EOF > /tmp/manifest_os_xray
 name: os-xray
 version: "${BUILD_DATE}"
-origin: opnsense/os-xray
+origin: security/os-xray
 comment: "Xray-core 7-layer Sniffing & Routing Engine with Web UI Manager"
 desc: "OPNsense WebGUI plugin for Xray-core proxy engine"
 maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
-categories: [opnsense]
+categories: [security]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
@@ -569,22 +569,22 @@ if [ -d "${WORKSPACE_DIR}/src/os-netbox/src" ]; then
   cat << EOF > /tmp/manifest_os_netbox
 name: os-netbox
 version: "${BUILD_DATE}"
-origin: opnsense/os-netbox
+origin: net/os-netbox
 comment: "NetBox Suite - Unified Policy Routing & Dynamic Split Tunneling"
 desc: "OPNsense Meta WebGUI suite plugin for NetBox / Split-Tunnel"
 maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
-categories: [opnsense]
+categories: [net]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
-  os-mosdns: { version: "${BUILD_DATE}", origin: "opnsense/os-mosdns" },
-  os-tun2socks: { version: "${BUILD_DATE}", origin: "opnsense/os-tun2socks" },
-  os-xray: { version: "${BUILD_DATE}", origin: "opnsense/os-xray" }
+  os-mosdns: { version: "${BUILD_DATE}", origin: "dns/os-mosdns" },
+  os-tun2socks: { version: "${BUILD_DATE}", origin: "net/os-tun2socks" },
+  os-xray: { version: "${BUILD_DATE}", origin: "security/os-xray" }
 }
 scripts: {
-  post-install: "#!/bin/sh\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\n[ -f /usr/local/etc/hev-socks5-tunnel/config.yaml.sample ] && [ ! -f /usr/local/etc/hev-socks5-tunnel/config.yaml ] && cp /usr/local/etc/hev-socks5-tunnel/config.yaml.sample /usr/local/etc/hev-socks5-tunnel/config.yaml || true\n[ -f /usr/local/etc/xray/config.json.sample ] && [ ! -f /usr/local/etc/xray/config.json ] && cp /usr/local/etc/xray/config.json.sample /usr/local/etc/xray/config.json || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  post-install: "#!/bin/sh\nmkdir -p /usr/local/etc/mosdns/rule\n[ -f /usr/local/etc/mosdns/config.yaml.sample ] && [ ! -f /usr/local/etc/mosdns/config.yaml ] && cp /usr/local/etc/mosdns/config.yaml.sample /usr/local/etc/mosdns/config.yaml || true\n[ -f /usr/local/etc/mosdns/rule/cn.txt ] || touch /usr/local/etc/mosdns/rule/cn.txt || true\n[ -f /usr/local/etc/mosdns/rule/gfw.txt ] || touch /usr/local/etc/mosdns/rule/gfw.txt || true\n[ -f /usr/local/etc/mosdns/rule/custom-direct.txt ] || touch /usr/local/etc/mosdns/rule/custom-direct.txt || true\n[ -f /usr/local/etc/mosdns/rule/custom-proxy.txt ] || touch /usr/local/etc/mosdns/rule/custom-proxy.txt || true\n[ -f /usr/local/etc/hev-socks5-tunnel/config.yaml.sample ] && [ ! -f /usr/local/etc/hev-socks5-tunnel/config.yaml ] && cp /usr/local/etc/hev-socks5-tunnel/config.yaml.sample /usr/local/etc/hev-socks5-tunnel/config.yaml || true\n[ -f /usr/local/etc/xray/config.json.sample ] && [ ! -f /usr/local/etc/xray/config.json ] && cp /usr/local/etc/xray/config.json.sample /usr/local/etc/xray/config.json || true\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
   pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF
