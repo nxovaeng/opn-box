@@ -1,0 +1,1103 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="适用于 OPNsense 26.x (FreeBSD 15) 的高性能策略路由与 DNS 动态分流套件">
+      
+      
+        <meta name="author" content="opn-box">
+      
+      
+        <link rel="canonical" href="https://opnbox.zro.qzz.io/06-evolution-and-modular-integration/">
+      
+      
+        <link rel="prev" href="../05-rules-and-maintenance/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>06. 架构演进与集成总结 - OPN-Box 技术文档与软件源</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#opn-box" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href=".." title="OPN-Box 技术文档与软件源" class="md-header__button md-logo" aria-label="OPN-Box 技术文档与软件源" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OPN-Box 技术文档与软件源
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              06. 架构演进与集成总结
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-orange"  aria-label="切换至暗黑模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换至暗黑模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="deep-orange"  aria-label="切换至浅色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换至浅色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/opn-box/opn-box" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    opn-box/opn-box
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  首页与软件源安装
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../01-design-philosophy/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  01. 核心设计哲学与架构
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../02-dns-and-pf-engine/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  02. DNS分流与PF同步引擎
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../03-dataplane-tun-xray/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  03. 数据平面(TUN与Xray)
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../04-control-plane-and-ui/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  04. 控制平面与OPNsense集成
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../05-rules-and-maintenance/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  05. 规则库生态与运维维护
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  06. 架构演进与集成总结
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="OPN-Box 技术文档与软件源" class="md-nav__button md-logo" aria-label="OPN-Box 技术文档与软件源" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    OPN-Box 技术文档与软件源
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/opn-box/opn-box" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    opn-box/opn-box
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页与软件源安装
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01. 核心设计哲学与架构
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-dns-and-pf-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02. DNS分流与PF同步引擎
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-dataplane-tun-xray/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03. 数据平面(TUN与Xray)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-control-plane-and-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04. 控制平面与OPNsense集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-rules-and-maintenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05. 规则库生态与运维维护
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06. 架构演进与集成总结
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06. 架构演进与集成总结
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、重大决策演进：从第三方控制端走向自研原生控制器
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、重大决策演进：从第三方控制端走向自研原生控制器">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 早期探索与痛点诊断
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-mosdns-controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 自研原生 MosDNS Controller 的落地
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、最终系统全链路架构
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opnsense" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、OPNsense 插件模块化重构成果
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、配置文件与守护进程规范
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、配置文件与守护进程规范">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 配置文件规范矩阵
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-freebsd-rcd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 FreeBSD rc.d 服务管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、重大决策演进：从第三方控制端走向自研原生控制器
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、重大决策演进：从第三方控制端走向自研原生控制器">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 早期探索与痛点诊断
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-mosdns-controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 自研原生 MosDNS Controller 的落地
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、最终系统全链路架构
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opnsense" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、OPNsense 插件模块化重构成果
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、配置文件与守护进程规范
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、配置文件与守护进程规范">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 配置文件规范矩阵
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-freebsd-rcd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 FreeBSD rc.d 服务管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="opn-box">OPN-Box 架构演进与全链路模块化集成总结</h1>
+<p>本文档记录了 OPN-Box 从初期技术探索到全面自研与模块化解耦的演进历程、核心架构设计以及各组件的运行规范。</p>
+<hr />
+<h2 id="_1">一、重大决策演进：从第三方控制端走向自研原生控制器</h2>
+<h3 id="11">1.1 早期探索与痛点诊断</h3>
+<p>初期曾尝试引入 <code>luoye663/mosdns-controller</code> 作为 Web 管理控制台，但在深入评估与适配过程中暴露了严重的系统级痛点：
+1. <strong>深度强绑定非官方分叉</strong>：上游强依赖其特定的 <code>managed-dns</code> 源码分支，无法直接与 MosDNS 官方版本及自研的 <code>pf_alias</code> 插件平滑集成；
+2. <strong>技术栈沉重且跨平台水土不服</strong>：原实现采用 Node.js/Vue 前后端分离编译，依赖 SQLite 数据库与外部 API 中转层，原本主要面向 Linux systemd 环境，在 FreeBSD / OPNsense 下进程生命周期与资源占用均显臃肿；
+3. <strong>分流逻辑与路由需求不匹配</strong>：企业级软路由的核心诉求是<strong>确定性的粗粒度白名单直连、黑名单代理与混合分流</strong>，繁杂的动态 API 代理层反而增加了系统的不稳定因素。</p>
+<h3 id="12-mosdns-controller">1.2 自研原生 MosDNS Controller 的落地</h3>
+<p>基于上述问题，团队果断重构并推出了完全自研的原生 Go 语言 <code>mosdns-controller</code>（<a href="file:///home/wym/devcode/opn-box/cmd/mosdns-controller/main.go"><code>cmd/mosdns-controller/main.go</code></a>）：
+- <strong>单二进制零依赖</strong>：基于 Go 1.24+ 静态编译，内嵌现代化暗黑风格 SPA 控制台，完全免去 Node.js、npm、SQLite 与外部 C 运行库依赖；
+- <strong>三种清晰分流模式</strong>：
+  - <code>whitelist</code>（白名单直连模式，推荐）：明确国内域名走直连，其余所有出海与未知域名走远端代理并同步入 PF 动态表；
+  - <code>blacklist</code>（黑名单代理模式）：明确 GFW 域名走代理入表，其余全部走直连；
+  - <code>custom</code>（混合自定义模式）：直连列表走直连，代理列表走代理，未归类域名根据 <code>custom_default_route</code>（<code>proxy</code> 或 <code>direct</code>）兜底；
+- <strong>三组规则库自由管理</strong>：直连自定义 (<code>custom-direct.txt</code>)、代理自定义 (<code>custom-proxy.txt</code>)、恶意广告拦截 (<code>custom-block.txt</code>)，实时持久化热重载；
+- <strong>实时域名路由推演模拟器</strong>：内置 <code>/api/test-domain</code> 接口，管理员可在界面即时输入任意域名，直观查看命中的规则集、匹配耗时与路由去向（直连/代理/阻止）；
+- <strong>SOCKS5 远端上游支持</strong>：原生支持 <code>remote_socks5</code> 字段，出海上游（如 <code>tcp://1.1.1.1:53</code>）直接通过本地回环 SOCKS5 代理远端发起，完全不触碰 TUN 网卡，消除了死锁风险。</p>
+<hr />
+<h2 id="_2">二、最终系统全链路架构</h2>
+<pre class="mermaid"><code>graph TD
+    Client["局域网客户端 (PC / 手机)"] --&gt;|DNS 请求 :53| MosDNS["MosDNS v5.3.4 (自编译双合一)"]
+
+    subgraph ControlPlane["统一控制面 (Go 静态单二进制 + 内嵌 WebUI)"]
+        MosDNSCtrl["MosDNS Controller (:5380)&lt;br/&gt;模式切换 / 规则热载 / 路由模拟"]
+        HevCtrl["Tun2Socks Manager (:5382)&lt;br/&gt;TUN 网卡监控 / MTU 调优"]
+        XrayCtrl["Xray Manager (:5384)&lt;br/&gt;订阅管理 / 节点测速 / 7层分流"]
+    end
+
+    subgraph DNSLayer["第 1 层：DNS 解析与零首包竞态入表"]
+        MosDNS --&gt;|国内白名单 cn.txt| LocalDNS["国内上游 (223.5.5.5)"]
+        MosDNS --&gt;|出海/未知域名| RemoteDNS["海外上游 (tcp://1.1.1.1:53)"]
+        RemoteDNS -.-&gt;|SOCKS5 lo0 环回| XraySocks["Xray SOCKS5 (127.0.0.1:10808)"]
+        MosDNS --&gt;|解析完成拿到 IP| PFAlias["自研 pf_alias 插件 (pkg/plugin)"]
+        PFAlias --&gt;|SOCK_SEQPACKET| PFAliasD["pf-aliasd 守护进程"]
+        PFAliasD --&gt;|ioctl DIOCRADDADDRS| DevPF["FreeBSD 内核 /dev/pf"]
+        DevPF --&gt;|写入| Table["table &lt;GFW_Proxy&gt; persist"]
+    end
+
+    subgraph DataPlane["第 2 层：内核包过滤与策略路由"]
+        Client --&gt;|后续业务 SYN 流量| PFFilter["FreeBSD PF 策略路由"]
+        PFFilter --&gt;|命中 GFW_Proxy 表| RouteTo["route-to (tun_box)"]
+        RouteTo --&gt; TunDev["hev-socks5-tunnel (纯 C 协程 TUN 桥接)"]
+        TunDev --&gt;|转发| XraySocks
+    end
+
+    subgraph L7Layer["第 3 层：Xray 7层应用特征细分流"]
+        XraySocks --&gt; Sniffing["SNI 域名嗅探与 geosite 规则匹配"]
+        Sniffing --&gt;|OpenAI / Claude| AIOut["AI 专用出口节点"]
+        Sniffing --&gt;|Netflix / Disney| MediaOut["流媒体解锁出口节点"]
+        Sniffing --&gt;|常规出海流量| MainOut["主力代理节点出口 (VLESS/xhttp)"]
+    end</code></pre>
+<hr />
+<h2 id="opnsense">三、OPNsense 插件模块化重构成果</h2>
+<p>为了杜绝单体大插件带来的耦合与依赖冲突，系统全面解耦为 4 个清晰独立的 OPNsense 软件包，统一锚定在 <code>Services -&gt; NetBox</code> 导航树下：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">软件包名称</th>
+<th style="text-align: left;">对应源码目录</th>
+<th style="text-align: left;">负责功能</th>
+<th style="text-align: left;">关键命令与动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong><code>os-mosdns</code></strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/src/os-mosdns"><code>src/os-mosdns</code></a></td>
+<td style="text-align: left;">MosDNS 解析引擎、<code>pf-aliasd</code> 零竞态同步、<code>mosdns-controller</code></td>
+<td style="text-align: left;"><code>configctl mosdns {start\|stop\|restart\|status}</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>os-tun2socks</code></strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/src/os-tun2socks"><code>src/os-tun2socks</code></a></td>
+<td style="text-align: left;"><code>hev-socks5-tunnel</code> 虚拟网卡守护、<code>hev-controller</code> 控制面板</td>
+<td style="text-align: left;"><code>configctl tun2socks {start\|stop\|restart\|status}</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>os-xray</code></strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/src/os-xray"><code>src/os-xray</code></a></td>
+<td style="text-align: left;"><code>xray-core</code> 7层代理网关、<code>xray-controller</code> 订阅与节点控制面板</td>
+<td style="text-align: left;"><code>configctl xray {start\|stop\|restart\|status}</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>os-netbox</code></strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/src/os-netbox"><code>src/os-netbox</code></a></td>
+<td style="text-align: left;">NetBox 顶级菜单总入口、全链路一键启停巡检、全套规则库自动同步</td>
+<td style="text-align: left;"><code>configctl netbox {start\|stop\|status\|rules.update}</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_3">四、配置文件与守护进程规范</h2>
+<h3 id="41">4.1 配置文件规范矩阵</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">服务组件</th>
+<th style="text-align: left;">样例模板文件</th>
+<th style="text-align: left;">系统部署路径</th>
+<th style="text-align: left;">配置特性与职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>MosDNS</strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/config.mosdns.example.yaml"><code>config.mosdns.example.yaml</code></a></td>
+<td style="text-align: left;"><code>/usr/local/etc/mosdns/config.yaml</code></td>
+<td style="text-align: left;">MosDNS v5 数据面配置，由 Controller 动态维护与覆盖</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MosDNS Controller</strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/config.mosdns-controller.example.yaml"><code>config.mosdns-controller.example.yaml</code></a></td>
+<td style="text-align: left;"><code>/usr/local/etc/mosdns/controller.yaml</code></td>
+<td style="text-align: left;">自研控制器配置（分流模式、上游 DNS、SOCKS5 代理、PF 表联动）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Tun2Socks</strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/config.hev-socks5-tunnel.example.yaml"><code>config.hev-socks5-tunnel.example.yaml</code></a></td>
+<td style="text-align: left;"><code>/usr/local/etc/hev-socks5-tunnel/config.yaml</code></td>
+<td style="text-align: left;">TUN 虚拟网卡（<code>tun_box</code>）、MTU、本地 SOCKS5 转发目标配置</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Xray-core</strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/config.xray.example.json"><code>config.xray.example.json</code></a></td>
+<td style="text-align: left;"><code>/usr/local/etc/xray/config.json</code></td>
+<td style="text-align: left;">Xray 运行时配置（内置 DNS 10853、SOCKS5 10808、节点出站）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Xray Controller</strong></td>
+<td style="text-align: left;"><a href="file:///home/wym/devcode/opn-box/config.xray-controller.example.json"><code>config.xray-controller.example.json</code></a></td>
+<td style="text-align: left;"><code>/usr/local/etc/xray/controller_data.json</code></td>
+<td style="text-align: left;">控制器业务数据模板（订阅源、节点列表、7层分流规则、局域网入站）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-freebsd-rcd">4.2 FreeBSD rc.d 服务管理</h3>
+<p>全套组件采用原生 FreeBSD <code>rc.subr</code> + <code>/usr/sbin/daemon</code> 托管：
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># 启用所有服务自启</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sysrc<span class="w"> </span><span class="nv">pf_aliasd_enable</span><span class="o">=</span><span class="s2">"YES"</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sysrc<span class="w"> </span><span class="nv">mosdns_enable</span><span class="o">=</span><span class="s2">"YES"</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>sysrc<span class="w"> </span><span class="nv">mosdns_controller_enable</span><span class="o">=</span><span class="s2">"YES"</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>sysrc<span class="w"> </span><span class="nv">hev_socks5_tunnel_enable</span><span class="o">=</span><span class="s2">"YES"</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>sysrc<span class="w"> </span><span class="nv">hev_controller_enable</span><span class="o">=</span><span class="s2">"YES"</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>sysrc<span class="w"> </span><span class="nv">xray_enable</span><span class="o">=</span><span class="s2">"YES"</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>sysrc<span class="w"> </span><span class="nv">xray_controller_enable</span><span class="o">=</span><span class="s2">"YES"</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># 统一或单项服务启停控制</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>service<span class="w"> </span>pf_aliasd<span class="w"> </span>start
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>service<span class="w"> </span>mosdns<span class="w"> </span>start
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>service<span class="w"> </span>mosdns_controller<span class="w"> </span>start
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>service<span class="w"> </span>hev_socks5_tunnel<span class="w"> </span>start
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>service<span class="w"> </span>hev_controller<span class="w"> </span>start
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>service<span class="w"> </span>xray<span class="w"> </span>start
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>service<span class="w"> </span>xray_controller<span class="w"> </span>start
+</span></code></pre></div></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

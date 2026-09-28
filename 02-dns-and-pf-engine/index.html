@@ -1,0 +1,1337 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="适用于 OPNsense 26.x (FreeBSD 15) 的高性能策略路由与 DNS 动态分流套件">
+      
+      
+        <meta name="author" content="opn-box">
+      
+      
+        <link rel="canonical" href="https://opnbox.zro.qzz.io/02-dns-and-pf-engine/">
+      
+      
+        <link rel="prev" href="../01-design-philosophy/">
+      
+      
+        <link rel="next" href="../03-dataplane-tun-xray/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>02. DNS分流与PF同步引擎 - OPN-Box 技术文档与软件源</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dns" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href=".." title="OPN-Box 技术文档与软件源" class="md-header__button md-logo" aria-label="OPN-Box 技术文档与软件源" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OPN-Box 技术文档与软件源
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              02. DNS分流与PF同步引擎
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-orange"  aria-label="切换至暗黑模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换至暗黑模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="deep-orange"  aria-label="切换至浅色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换至浅色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/opn-box/opn-box" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    opn-box/opn-box
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  首页与软件源安装
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../01-design-philosophy/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  01. 核心设计哲学与架构
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  02. DNS分流与PF同步引擎
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../03-dataplane-tun-xray/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  03. 数据平面(TUN与Xray)
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../04-control-plane-and-ui/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  04. 控制平面与OPNsense集成
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../05-rules-and-maintenance/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  05. 规则库生态与运维维护
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../06-evolution-and-modular-integration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  06. 架构演进与集成总结
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="OPN-Box 技术文档与软件源" class="md-nav__button md-logo" aria-label="OPN-Box 技术文档与软件源" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    OPN-Box 技术文档与软件源
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/opn-box/opn-box" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    opn-box/opn-box
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页与软件源安装
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01. 核心设计哲学与架构
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02. DNS分流与PF同步引擎
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02. DNS分流与PF同步引擎
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-packet-race-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、首包竞态（First-Packet Race Condition）的本质与破解
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、首包竞态（First-Packet Race Condition）的本质与破解">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#opn-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OPN-Box 的零竞态消除方案
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、系统内部架构与模块职责
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sock_seqpacket" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、通信协议设计：SOCK_SEQPACKET
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、通信协议设计：SOCK_SEQPACKET">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sock_seqpacket_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        为什么选择 SOCK_SEQPACKET？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        报文格式布局
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#min-heap-ttl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、Min-Heap TTL 到期调度器原理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opnsense" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、OPNsense 最佳落地配置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五、OPNsense 最佳落地配置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-external-advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 创建 External (advanced) 别名
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-lan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 配置 LAN 策略路由放行
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dns-53-vs-5353-nat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、DNS 监听接入方案：直接监听 53 端口 vs 5353 NAT 重定向
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="六、DNS 监听接入方案：直接监听 53 端口 vs 5353 NAT 重定向">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-amosdns-53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 方案 A：MosDNS 直接监听 53 端口（独占模式，强烈推荐）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-bmosdns-5353-unbound-dhcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 方案 B：MosDNS 监听 5353 + Unbound 串联（保留 DHCP 域名特性）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-lan-53-nat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 关键防御：为什么强烈建议配置一条 LAN 53 端口 NAT 劫持规则？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、数据面解耦
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-dataplane-tun-xray/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03. 数据平面(TUN与Xray)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-control-plane-and-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04. 控制平面与OPNsense集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-rules-and-maintenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05. 规则库生态与运维维护
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-evolution-and-modular-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06. 架构演进与集成总结
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-packet-race-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、首包竞态（First-Packet Race Condition）的本质与破解
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、首包竞态（First-Packet Race Condition）的本质与破解">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#opn-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OPN-Box 的零竞态消除方案
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、系统内部架构与模块职责
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sock_seqpacket" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、通信协议设计：SOCK_SEQPACKET
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、通信协议设计：SOCK_SEQPACKET">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sock_seqpacket_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        为什么选择 SOCK_SEQPACKET？
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        报文格式布局
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#min-heap-ttl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、Min-Heap TTL 到期调度器原理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opnsense" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、OPNsense 最佳落地配置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五、OPNsense 最佳落地配置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-external-advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 创建 External (advanced) 别名
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-lan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 配置 LAN 策略路由放行
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dns-53-vs-5353-nat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、DNS 监听接入方案：直接监听 53 端口 vs 5353 NAT 重定向
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="六、DNS 监听接入方案：直接监听 53 端口 vs 5353 NAT 重定向">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-amosdns-53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 方案 A：MosDNS 直接监听 53 端口（独占模式，强烈推荐）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-bmosdns-5353-unbound-dhcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 方案 B：MosDNS 监听 5353 + Unbound 串联（保留 DHCP 域名特性）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-lan-53-nat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 关键防御：为什么强烈建议配置一条 LAN 53 端口 NAT 劫持规则？
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、数据面解耦
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="dns">DNS 动态分流与零竞态内核同步引擎</h1>
+<h2 id="first-packet-race-condition">一、首包竞态（First-Packet Race Condition）的本质与破解</h2>
+<p>在传统的 “DNS 分流 + 防火墙策略路由” 方案中，DNS 服务（如 Dnsmasq、AdGuard Home、普通 MosDNS）在解析出境外 IP 后，通常采用两种入表方式：
+1. <strong>异步外部脚本</strong>：在后台启动 Shell 进程执行 <code>pfctl -t GFW -T add &lt;ip&gt;</code>；
+2. <strong>异步非阻塞通知</strong>：通过消息队列广播，主线程直接向客户端响应 DNS 请求。</p>
+<pre class="mermaid"><code>sequenceDiagram
+    autonumber
+    actor Client as 客户端
+    participant DNS as 普通 DNS 服务
+    participant PF as 内核 PF 表
+    participant WAN as 默认直连网关
+    participant Proxy as 代理网关
+
+    Client-&gt;&gt;DNS: 1. 解析 google.com
+    DNS--&gt;&gt;Client: 2. 异步入表指令发送中，直接返回 IP 142.250.x.x
+    par 竞态发生
+        Client-&gt;&gt;PF: 3. 立即发起 TCP SYN (目的: 142.250.x.x)
+        Note over PF: 此时 PF 尚未完成加表操作！
+        PF-&gt;&gt;WAN: 4. 判定不命中规则 -&gt; 走默认直连网关 (连接重置 / 封锁 / 漏流)
+    and
+        DNS-&gt;&gt;PF: 5. 延迟写入 IP 到 GFW 别名表 (迟到的入表)
+    end</code></pre>
+<h3 id="opn-box">OPN-Box 的零竞态消除方案</h3>
+<p>OPN-Box 的核心原则是 <strong>“强同步屏障 (Synchronous Barrier)”</strong>：</p>
+<pre class="mermaid"><code>sequenceDiagram
+    autonumber
+    actor Client as 客户端
+    participant MosDNS as MosDNS (pf_alias)
+    participant Daemon as pf-aliasd 守护进程
+    participant PF as FreeBSD 内核 (/dev/pf)
+    participant Proxy as 代理通道 (hev-socks5-tunnel)
+
+    Client-&gt;&gt;MosDNS: 1. 发起 google.com 查询
+    MosDNS-&gt;&gt;MosDNS: 2. 远端安全 DoH 解析出 IP 与 TTL
+    MosDNS-&gt;&gt;Daemon: 3. SOCK_SEQPACKET 发送 ADD &lt;IP, TTL, GFW_Proxy&gt;
+    Daemon-&gt;&gt;PF: 4. ioctl(/dev/pf, DIOCRADDADDRS) 直接内核入表
+    PF--&gt;&gt;Daemon: 5. 内核成功返回 (0.03ms)
+    Daemon--&gt;&gt;MosDNS: 6. 返回 ACK 确认包
+    MosDNS--&gt;&gt;Client: 7. 阻断解除：正式返回 DNS 应答报文
+    Client-&gt;&gt;PF: 8. 客户端发起 TCP SYN
+    Note over PF: 此时内核已存在该 IP！
+    PF-&gt;&gt;Proxy: 9. 100% 命中策略路由 -&gt; 极速导入代理通道</code></pre>
+<p>整个同步往返仅耗时 <strong>0.05 ~ 0.1 毫秒</strong>，客户端察觉不到任何停顿，但彻底保障了 100% 的分流命中率。</p>
+<hr />
+<h2 id="_1">二、系统内部架构与模块职责</h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌────────────────────────────────────────────────────────────────────────┐
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│ MosDNS v5 / MosDNS-X 进程                                              │
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│                                                                        │
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   query_is_direct_domain ──&gt; [ 是 ] ──&gt; forward_local (223.5.5.5)      │
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│            │                                                           │
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│           [ 否 ] (出海名单 + 未分类域名)                                │
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│            ▼                                                           │
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   forward_remote (1.1.1.1 / 8.8.8.8 DoH)                              │
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│            │                                                           │
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│            ▼ 提取 A/AAAA 记录及最小 TTL                                 │
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│   pf_alias 插件 (pkg/plugin/pf_alias.go)                               │
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│     • 本地 LRU 缓存热点去重 (避免重复查询触发无谓 IPC)                 │
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│     • 钳位 TTL (默认 60s ~ 86400s)                                     │
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>└────────────────────────────┬───────────────────────────────────────────┘
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                             │ AF_UNIX / SOCK_SEQPACKET
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>                             │ /var/run/pf-aliasd.sock (含 100ms 超时保护)
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>┌────────────────────────────▼───────────────────────────────────────────┐
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│ pf-aliasd 常驻守护进程 (cmd/pf-aliasd/main.go)                         │
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│                                                                        │
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│   • 请求解码 (ADD / DEL / FLUSH)                                       │
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│   • 打开常驻句柄: fd = open("/dev/pf", O_RDWR)                         │
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│   • 单次系统调用: ioctl(fd, DIOCRADDADDRS, &amp;io)                        │
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│   • 优先队列到期调度器 (pkg/ttlcleaner/tracker.go - Min-Heap)          │
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│       ├── IP 命中时：动态更新到期时间并调整堆 (O(log N))               │
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│       └── 后台 GC 协程 (1s 周期)：批量弹出到期 IP 集合                  │
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│            └── 单次批量删除: ioctl(fd, DIOCRADDADDRS, &amp;del_io)         │
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>└────────────────────────────┬───────────────────────────────────────────┘
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>                             │
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>                             ▼
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>┌────────────────────────────────────────────────────────────────────────┐
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│ FreeBSD 内核空间 (Packet Filter Engine)                                │
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│                                                                        │
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│   table &lt;GFW_Proxy&gt; persist (OPNsense External Alias)                  │
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│   RADIX 树高速匹配 -&gt; 命中即执行 route-to (tun0)                       │
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>└────────────────────────────────────────────────────────────────────────┘
+</span></code></pre></div>
+<hr />
+<h2 id="sock_seqpacket">三、通信协议设计：SOCK_SEQPACKET</h2>
+<p>OPN-Box 在进程间通信中抛弃了低效的纯文本或 JSON 格式，在 <code>pkg/protocol/</code> 中设计了紧凑的二进制帧协议，并采用 <strong><code>AF_UNIX + SOCK_SEQPACKET</code></strong> 套接字类型：</p>
+<h3 id="sock_seqpacket_1">为什么选择 SOCK_SEQPACKET？</h3>
+<ol>
+<li><strong>自带报文边界</strong>：与 <code>SOCK_STREAM</code>（需自定义头长度避免粘包）不同，<code>SEQPACKET</code> 保证单次 <code>write</code> 对应单次 <code>read</code>，零内存拼接分包开销。</li>
+<li><strong>面向连接与流控</strong>：与 <code>SOCK_DGRAM</code>（不可靠、易丢包）不同，<code>SEQPACKET</code> 提供连接状态保持与内核级发送缓冲区背压机制。</li>
+</ol>
+<h3 id="_2">报文格式布局</h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a> 0                   1                   2                   3
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a> 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>|          Magic (0x5046)       |    Version    |    Command    |
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>|                           Sequence ID                         |
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>|                         TTL (Seconds)                         |
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>|         Table Name (固定 32 字节，以 0x00 填充结尾)           |
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>|                                                               |
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>|   IP Type     |   IP Bytes (IPv4: 4 字节 / IPv6: 16 字节)     |
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</span></code></pre></div>
+<ul>
+<li><strong>Magic</strong>：<code>0x5046</code> (ASCII "PF")，防错报文过滤。</li>
+<li><strong>Command</strong>：</li>
+<li><code>0x01</code>: <code>CMD_ADD</code>（入表并注册 TTL）</li>
+<li><code>0x02</code>: <code>CMD_DEL</code>（手动即刻出表）</li>
+<li><code>0x03</code>: <code>CMD_FLUSH</code>（清空表）</li>
+<li><code>0x80</code>: <code>CMD_ACK</code>（操作成功）</li>
+<li><code>0x81</code>: <code>CMD_ERR</code>（内核失败返回）</li>
+</ul>
+<hr />
+<h2 id="min-heap-ttl">四、Min-Heap TTL 到期调度器原理</h2>
+<p>内核的 PF Table 没有原生的条目生存期（TTL）控制。若只增不减，系统运行一周后表项可达数万条，最终导致 OPNsense 内存耗尽或规则重载超时。</p>
+<p><code>pf-aliasd</code> 内置了基于<strong>小顶堆（Min-Heap）</strong>的到期追踪系统（<a href="file:///home/yaofen/opn-box/pkg/ttlcleaner/tracker.go">pkg/ttlcleaner/tracker.go</a>）：</p>
+<ol>
+<li><strong>注册与续期复杂度 O(log N)</strong>：</li>
+<li>内部维护 <code>HashMap[IPString]*HeapNode</code> 记录堆索引。</li>
+<li>当客户端频繁访问 YouTube 或 Google 时，同一 IP 反复被解析。追踪器直接找到对应堆节点，更新其到期绝对时间戳为 <code>now + new_ttl</code>，随后执行 <code>heap.Fix()</code> 重新平衡堆结构，绝不产生冗余副本。</li>
+<li><strong>批量垃圾回收（Batch GC）</strong>：</li>
+<li>后台协程每 1 秒检查一次堆顶节点。</li>
+<li>若堆顶到期，循环弹出所有满足 <code>expireTime &lt;= now</code> 的节点，存入批量数组。</li>
+<li>累积的到期 IP 列表打包成一次 <code>pfr_table</code> 批量结构体，发起单次 <code>ioctl(DIOCRDELADDRS)</code> 系统调用。一次系统调用可同时清除成百上千个陈旧 IP，对系统性能零抖动。</li>
+</ol>
+<hr />
+<h2 id="opnsense">五、OPNsense 最佳落地配置</h2>
+<h3 id="1-external-advanced">1. 创建 External (advanced) 别名</h3>
+<ul>
+<li>进入 <strong>Firewall -&gt; Aliases</strong>；</li>
+<li>新建别名，名称为 <code>GFW_Proxy</code>；</li>
+<li>类型必须选择 <strong><code>External (advanced)</code></strong>。<blockquote>
+<p><strong>关键原理</strong>：OPNsense 识别到 <code>External</code> 别名时，会在底层生成带有 <code>persist</code> 属性的 PF 表（<code>table &lt;GFW_Proxy&gt; persist</code>）。这保证了 OPNsense 在日常保存规则或执行 Filter Reload 时，<strong>绝不会冲掉外部程序动态维护的 IP 条目</strong>。</p>
+</blockquote>
+</li>
+</ul>
+<h3 id="2-lan">2. 配置 LAN 策略路由放行</h3>
+<ul>
+<li>进入 <strong>Firewall -&gt; Rules -&gt; LAN</strong>；</li>
+<li>创建一条通行规则：</li>
+<li><strong>Destination</strong>：选择别名 <code>GFW_Proxy</code>；</li>
+<li><strong>Gateway</strong>：选择虚拟代理网关（即指向 <code>tun_box</code> 网卡的 Gateway 目标）。</li>
+<li>即可让所有命中该表的 IP 流量全部被内核底层拦截并导向 TUN 网卡。</li>
+</ul>
+<hr />
+<h2 id="dns-53-vs-5353-nat">六、DNS 监听接入方案：直接监听 53 端口 vs 5353 NAT 重定向</h2>
+<p>在 OPNsense 部署 MosDNS 时，关于端口监听与流量接入，存在两种典型的落地模式：</p>
+<h3 id="1-amosdns-53">1. 方案 A：MosDNS 直接监听 53 端口（独占模式，强烈推荐）</h3>
+<ul>
+<li><strong>实现方式</strong>：</li>
+<li>在 OPNsense 的 <strong>Services -&gt; Unbound DNS -&gt; General</strong> 中，取消勾选 <code>Enable Unbound</code>（或者将其端口改为备用端口如 <code>5335</code>）；</li>
+<li>MosDNS 配置文件中将监听地址设置为 <code>listen_addr: ":53"</code>（同时监听 UDP 与 TCP）；</li>
+<li>OPNsense DHCP 服务直接向局域网终端下发路由网关 IP 作为 DNS 服务器。</li>
+<li><strong>核心优势</strong>：</li>
+<li><strong>链路最短、极致性能</strong>：客户端直接直连 MosDNS，中间零 NAT 转换开销与进程转发开销；</li>
+<li><strong>真实客户端 IP 透传</strong>：MosDNS 日志与统计可以直接看到内网客户端真实 IP，排查与监控极为直观。</li>
+</ul>
+<h3 id="2-bmosdns-5353-unbound-dhcp">2. 方案 B：MosDNS 监听 5353 + Unbound 串联（保留 DHCP 域名特性）</h3>
+<ul>
+<li><strong>实现方式</strong>：</li>
+<li>Unbound 依然监听 <code>:53</code>，保留内网 DHCP 主机名与本地域解析；</li>
+<li>在 Unbound 的 <strong>Query Forwarding</strong> 中，将所有公网域名（<code>.</code>）全部转发至 <code>127.0.0.1:5353</code>（MosDNS）。</li>
+<li><strong>适用场景</strong>：适用于局域网内部高度依赖 OPNsense 原生 DHCP 主机名解析的复杂内网。</li>
+</ul>
+<h3 id="3-lan-53-nat">3. 关键防御：为什么强烈建议配置一条 LAN 53 端口 NAT 劫持规则？</h3>
+<p>局域网中常有部分智能设备（如电视盒子、部分手机或 IoT 设备）硬编码了公共 DNS（如 <code>8.8.8.8</code> 或 <code>114.114.114.114</code>），它们会绕过 DHCP 分发的 DNS 直接发起公网 53 端口查询。
+若不对这部分流量进行拦截，将导致其访问的境外 IP 无法触发 MosDNS 的 <code>pf_alias</code> 写入内核，从而造成代理失效或首包漏流。</p>
+<p><strong>OPNsense 最佳防漏流规则（Firewall -&gt; NAT -&gt; Port Forward）</strong>：
+- <strong>Interface</strong>: LAN
+- <strong>Protocol</strong>: TCP/UDP
+- <strong>Destination</strong>: <code>invert (勾选反选)</code> -&gt; <code>LAN address</code>（即凡是目的 IP 不是路由器本身的 53 流量）
+- <strong>Destination Port</strong>: <code>53 (DNS)</code>
+- <strong>Redirect target IP</strong>: 路由器网关 IP（如 <code>192.168.1.1</code>）
+- <strong>Redirect target Port</strong>: MosDNS 监听端口（<code>53</code> 或 <code>5353</code>）
+通过这条规则，局域网中所有私设 DNS 的请求均会被内核强行捕获并送入 MosDNS 分流流水线。</p>
+<hr />
+<h2 id="_3">七、数据面解耦</h2>
+<p>在许多传统代理方案中，DNS 查询常常陷入死锁：解析远程节点域名需要过 TUN，而 TUN 的转发又依赖 DNS 解析出来的目标 IP。OPN-Box 从根本上杜绝了这一死锁链条：</p>
+<pre class="mermaid"><code>sequenceDiagram
+    autonumber
+    actor Client as 局域网客户端
+    participant MosDNS as MosDNS (:53)
+    participant XraySocks as Xray (127.0.0.1:10808)
+    participant PF as 内核 PF (&lt;GFW_Proxy&gt;)
+    participant TUN as hev-socks5-tunnel (tun_box)
+    participant VPS as 远端代理服务器
+
+    Note over MosDNS,XraySocks: 阶段一：纯控制面 DNS 解析 (不过 TUN)
+    Client-&gt;&gt;MosDNS: 1. 解析 youtube.com
+    MosDNS-&gt;&gt;XraySocks: 2. SOCKS5 TCP 请求 (lo0 本地回环)
+    XraySocks-&gt;&gt;VPS: 3. 密文出站直连 (物理 WAN 网卡)
+    VPS--&gt;&gt;XraySocks: 4. 返回真实无污染 IP 142.250.x.x
+    XraySocks--&gt;&gt;MosDNS: 5. SOCKS5 响应完成
+    MosDNS-&gt;&gt;PF: 6. pf_alias 同步入表 &lt;GFW_Proxy&gt;
+    MosDNS--&gt;&gt;Client: 7. 返回 DNS 响应报文
+
+    Note over Client,TUN: 阶段二：数据面业务连接 (仅此时过 TUN)
+    Client-&gt;&gt;PF: 8. 发起业务 TCP SYN (目的: 142.250.x.x)
+    PF-&gt;&gt;TUN: 9. 命中 &lt;GFW_Proxy&gt;，route-to (tun_box)
+    TUN-&gt;&gt;XraySocks: 10. 转入代理核心
+    XraySocks-&gt;&gt;VPS: 11. 代理传输业务数据</code></pre>
+<ol>
+<li><strong>L5/L7 回环隔离（Loopback Socket）</strong>：</li>
+<li>MosDNS 在配置 <code>remote_socks5: "127.0.0.1:10808"</code> 后，发起海外 DNS 解析本质上是在本地回环设备（<code>lo0</code>）上与 Xray 建立标准的 SOCKS5 握手连接；</li>
+<li>流量自始至终不离开主机回环，<strong>完全不会接触 <code>tun_box</code> 虚拟网卡设备，也不会被 PF 防火墙的策略路由规则捕获</strong>。</li>
+<li><strong>天然免疫策略路由死锁</strong>：</li>
+<li>DNS 无论何时都能通过 SOCKS5 稳定拿到真实 IP，完全不依赖 TUN 的运行状态；</li>
+<li>真正需要通过 TUN 导向代理通道的，仅仅是客户端在解析完成后发起的后续业务数据流（命中 <code>&lt;GFW_Proxy&gt;</code> 表的 IP）。</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
