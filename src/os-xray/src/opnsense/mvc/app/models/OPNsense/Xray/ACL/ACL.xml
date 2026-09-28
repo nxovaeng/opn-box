@@ -1,0 +1,10 @@
+<acl>
+    <page-services-xray>
+        <name>Services: Xray</name>
+        <patterns>
+            <pattern>ui/xray/*</pattern>
+            <pattern>ui/xray</pattern>
+            <pattern>api/xray/*</pattern>
+        </patterns>
+    </page-services-xray>
+</acl>

@@ -1,0 +1,10 @@
+<acl>
+    <page-services-tun2socks>
+        <name>Services: Tun2Socks</name>
+        <patterns>
+            <pattern>ui/tun2socks/*</pattern>
+            <pattern>ui/tun2socks</pattern>
+            <pattern>api/tun2socks/*</pattern>
+        </patterns>
+    </page-services-tun2socks>
+</acl>

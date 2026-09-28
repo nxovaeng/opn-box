@@ -1,0 +1,10 @@
+<acl>
+    <page-services-netbox>
+        <name>Services: NetBox Suite</name>
+        <patterns>
+            <pattern>ui/netbox/*</pattern>
+            <pattern>ui/netbox</pattern>
+            <pattern>api/netbox/*</pattern>
+        </patterns>
+    </page-services-netbox>
+</acl>

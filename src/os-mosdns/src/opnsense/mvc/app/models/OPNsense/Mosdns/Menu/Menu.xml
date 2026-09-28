@@ -2,9 +2,7 @@
     <Services>
         <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
             <MosDNS VisibleName="MosDNS" Order="10">
-                <Dashboard VisibleName="MosDNS Controller" url="http://{SERVER_ADDR}:5380" target="_blank" Order="10"/>
-                <General VisibleName="MosDNS Settings" url="/ui/mosdns/general" Order="20"/>
-                <Log VisibleName="MosDNS Log" url="/ui/diagnostics/log/core/mosdns" Order="30"/>
+                <Dashboard VisibleName="MosDNS Controller" url="/ui/mosdns" Order="10"/>
             </MosDNS>
         </NetBox>
     </Services>

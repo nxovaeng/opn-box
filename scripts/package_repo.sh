@@ -367,16 +367,16 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 3.6 Package: hev-socks5-tunnel (高性能 Tun2Socks 代理与 WebUI 管理器)
+# 3.6 Package: hev-controller (Tun2Socks Web 管理面板，自编译)
 # ------------------------------------------------------------------------------
-if [ -f "${STAGE_DIR}/usr/local/bin/hev-socks5-tunnel" ] || [ -f "${STAGE_DIR}/usr/local/bin/hev-controller" ]; then
-  echo "==> 打包 hev-socks5-tunnel (Tun2Socks + Controller, v${HEV_TUNNEL_VERSION})..."
-  cat << EOF > /tmp/manifest_hev
-name: hev-socks5-tunnel
-version: "${HEV_TUNNEL_VERSION}"
-origin: net/hev-socks5-tunnel
-comment: "High-performance Tun2Socks proxy bridge and Web UI manager"
-desc: "hev-socks5-tunnel compiled from source with coroutines and hev-controller WebUI"
+if [ -f "${STAGE_DIR}/usr/local/bin/hev-controller" ]; then
+  echo "==> 打包 hev-controller (自编: ${BUILD_DATE})..."
+  cat << EOF > /tmp/manifest_hev_controller
+name: hev-controller
+version: "${BUILD_DATE}"
+origin: net/hev-controller
+comment: "Web UI and Mode Controller for hev-socks5-tunnel"
+desc: "hev-controller WebUI manager for OPNsense"
 maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
@@ -384,27 +384,76 @@ categories: [net]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 EOF
-  rm -f /tmp/plist_hev
-  [ -f "${STAGE_DIR}/usr/local/bin/hev-socks5-tunnel" ] && echo "bin/hev-socks5-tunnel" >> /tmp/plist_hev
-  [ -f "${STAGE_DIR}/usr/local/bin/hev-controller" ] && echo "bin/hev-controller" >> /tmp/plist_hev
-  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/hev_socks5_tunnel" ] && echo "etc/rc.d/hev_socks5_tunnel" >> /tmp/plist_hev
-  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/hev_controller" ] && echo "etc/rc.d/hev_controller" >> /tmp/plist_hev
-  [ -f "${STAGE_DIR}/usr/local/etc/hev-socks5-tunnel/config.yaml.sample" ] && echo "etc/hev-socks5-tunnel/config.yaml.sample" >> /tmp/plist_hev
+  cat << EOF > /tmp/plist_hev_controller
+bin/hev-controller
+etc/rc.d/hev_controller
+etc/hev-socks5-tunnel/config.yaml.sample
+EOF
+  pkg create -M /tmp/manifest_hev_controller -p /tmp/plist_hev_controller -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
+fi
 
+# ------------------------------------------------------------------------------
+# 3.7 Package: hev-socks5-tunnel (高性能 Tun2Socks 虚拟网卡代理)
+# ------------------------------------------------------------------------------
+if [ -f "${STAGE_DIR}/usr/local/bin/hev-socks5-tunnel" ]; then
+  echo "==> 打包 hev-socks5-tunnel (官方稳定版, v${HEV_TUNNEL_VERSION})..."
+  cat << EOF > /tmp/manifest_hev
+name: hev-socks5-tunnel
+version: "${HEV_TUNNEL_VERSION}"
+origin: net/hev-socks5-tunnel
+comment: "High-performance Tun2Socks proxy bridge"
+desc: "hev-socks5-tunnel compiled from source with coroutines for OPNsense"
+maintainer: "admin@opn-box.local"
+www: "${PROJECT_WEB_URL}"
+prefix: /usr/local
+categories: [net]
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
+EOF
+  cat << EOF > /tmp/plist_hev
+bin/hev-socks5-tunnel
+etc/rc.d/hev_socks5_tunnel
+EOF
   pkg create -M /tmp/manifest_hev -p /tmp/plist_hev -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
-# 3.7 Package: xray-core (官方稳定版代理内核，原生支持 xhttp、VLESS 与 SNI 嗅探，内嵌 Web 管理器)
+# 3.8 Package: xray-controller (Xray Manager Web 管理面板，自编译)
 # ------------------------------------------------------------------------------
-if [ -f "${STAGE_DIR}/usr/local/bin/xray" ] || [ -f "${STAGE_DIR}/usr/local/bin/xray-controller" ]; then
-  echo "==> 打包 xray-core (官方稳定版 + Xray Manager, v${XRAY_VERSION})..."
+if [ -f "${STAGE_DIR}/usr/local/bin/xray-controller" ]; then
+  echo "==> 打包 xray-controller (自编: ${BUILD_DATE})..."
+  cat << EOF > /tmp/manifest_xray_controller
+name: xray-controller
+version: "${BUILD_DATE}"
+origin: security/xray-controller
+comment: "Web UI and Subscription Manager for Xray-core"
+desc: "xray-controller WebUI manager for OPNsense"
+maintainer: "admin@opn-box.local"
+www: "${PROJECT_WEB_URL}"
+prefix: /usr/local
+categories: [security]
+abi: "FreeBSD:15:amd64"
+arch: "FreeBSD:15:amd64"
+EOF
+  cat << EOF > /tmp/plist_xray_controller
+bin/xray-controller
+etc/rc.d/xray_controller
+etc/xray/config.json.sample
+EOF
+  pkg create -M /tmp/manifest_xray_controller -p /tmp/plist_xray_controller -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
+fi
+
+# ------------------------------------------------------------------------------
+# 3.9 Package: xray-core (官方稳定版代理内核，原生支持 xhttp、VLESS 与 SNI 嗅探)
+# ------------------------------------------------------------------------------
+if [ -f "${STAGE_DIR}/usr/local/bin/xray" ]; then
+  echo "==> 打包 xray-core (官方稳定版, v${XRAY_VERSION})..."
   cat << EOF > /tmp/manifest_xray
 name: xray-core
 version: "${XRAY_VERSION}"
 origin: security/xray-core
-comment: "Xray-core proxy engine with Web UI manager, VLESS, xhttp and sniffing support"
-desc: "Official Xray-core release packaged with xray-controller WebUI for OPNsense"
+comment: "Xray-core proxy engine with VLESS, xhttp and sniffing support"
+desc: "Official Xray-core release for OPNsense"
 maintainer: "admin@opn-box.local"
 www: "${PROJECT_WEB_URL}"
 prefix: /usr/local
@@ -414,18 +463,14 @@ arch: "FreeBSD:15:amd64"
 EOF
   rm -f /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/bin/xray" ] && echo "bin/xray" >> /tmp/plist_xray
-  [ -f "${STAGE_DIR}/usr/local/bin/xray-controller" ] && echo "bin/xray-controller" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/share/xray/geoip.dat" ] && echo "share/xray/geoip.dat" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/share/xray/geosite.dat" ] && echo "share/xray/geosite.dat" >> /tmp/plist_xray
   [ -f "${STAGE_DIR}/usr/local/etc/rc.d/xray" ] && echo "etc/rc.d/xray" >> /tmp/plist_xray
-  [ -f "${STAGE_DIR}/usr/local/etc/rc.d/xray_controller" ] && echo "etc/rc.d/xray_controller" >> /tmp/plist_xray
-  [ -f "${STAGE_DIR}/usr/local/etc/xray/config.json.sample" ] && echo "etc/xray/config.json.sample" >> /tmp/plist_xray
-
   pkg create -M /tmp/manifest_xray -p /tmp/plist_xray -r "${STAGE_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
-# 3.8 Package: os-mosdns (OPNsense WebGUI 插件 - DNS 动态分流与守护)
+# 3.10 Package: os-mosdns (OPNsense WebGUI 插件 - DNS 动态分流与守护)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-mosdns/src" ]; then
   echo "==> 打包 os-mosdns (OPNsense UI 插件，自编: ${BUILD_DATE})..."
@@ -449,16 +494,17 @@ deps: {
   mosdns: { version: "5.3.4", origin: "dns/mosdns" },
   mosdns-controller: { version: "${BUILD_DATE}", origin: "dns/mosdns-controller" }
 }
+scripts: {
+  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
+}
 EOF
-  cat << EOF > /tmp/plist_os_mosdns
-opnsense/service/conf/actions.d/actions_mosdns.conf
-opnsense/mvc/app/models/OPNsense/Mosdns/Menu/Menu.xml
-EOF
+  (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_mosdns
   pkg create -M /tmp/manifest_os_mosdns -p /tmp/plist_os_mosdns -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
-# 3.9 Package: os-tun2socks (OPNsense WebGUI 插件 - 虚拟网卡与隧道桥接)
+# 3.11 Package: os-tun2socks (OPNsense WebGUI 插件 - 虚拟网卡与隧道桥接)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-tun2socks/src" ]; then
   echo "==> 打包 os-tun2socks (OPNsense UI 插件，自编: ${BUILD_DATE})..."
@@ -478,18 +524,20 @@ categories: [opnsense]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
-  hev-socks5-tunnel: { version: "${HEV_TUNNEL_VERSION}", origin: "net/hev-socks5-tunnel" }
+  hev-socks5-tunnel: { version: "${HEV_TUNNEL_VERSION}", origin: "net/hev-socks5-tunnel" },
+  hev-controller: { version: "${BUILD_DATE}", origin: "net/hev-controller" }
+}
+scripts: {
+  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF
-  cat << EOF > /tmp/plist_os_tun2socks
-opnsense/service/conf/actions.d/actions_tun2socks.conf
-opnsense/mvc/app/models/OPNsense/Tun2socks/Menu/Menu.xml
-EOF
+  (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_tun2socks
   pkg create -M /tmp/manifest_os_tun2socks -p /tmp/plist_os_tun2socks -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
-# 3.10 Package: os-xray (OPNsense WebGUI 插件 - 7层嗅探与出海路由)
+# 3.12 Package: os-xray (OPNsense WebGUI 插件 - 7层嗅探与出海路由)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-xray/src" ]; then
   echo "==> 打包 os-xray (OPNsense UI 插件，自编: ${BUILD_DATE})..."
@@ -509,18 +557,20 @@ categories: [opnsense]
 abi: "FreeBSD:15:amd64"
 arch: "FreeBSD:15:amd64"
 deps: {
-  xray-core: { version: "${XRAY_VERSION}", origin: "security/xray-core" }
+  xray-core: { version: "${XRAY_VERSION}", origin: "security/xray-core" },
+  xray-controller: { version: "${BUILD_DATE}", origin: "security/xray-controller" }
+}
+scripts: {
+  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
 }
 EOF
-  cat << EOF > /tmp/plist_os_xray
-opnsense/service/conf/actions.d/actions_xray.conf
-opnsense/mvc/app/models/OPNsense/Xray/Menu/Menu.xml
-EOF
+  (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_xray
   pkg create -M /tmp/manifest_os_xray -p /tmp/plist_os_xray -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 
 # ------------------------------------------------------------------------------
-# 3.11 Package: os-netbox (OPNsense WebGUI 插件 - 全局分流总套件与规则同步)
+# 3.13 Package: os-netbox (OPNsense WebGUI 插件 - 全局分流总套件与规则同步)
 # ------------------------------------------------------------------------------
 if [ -d "${WORKSPACE_DIR}/src/os-netbox/src" ]; then
   echo "==> 打包 os-netbox (OPNsense UI 套件，自编: ${BUILD_DATE})..."
@@ -550,12 +600,12 @@ deps: {
   os-tun2socks: { version: "${BUILD_DATE}", origin: "opnsense/os-tun2socks" },
   os-xray: { version: "${BUILD_DATE}", origin: "opnsense/os-xray" }
 }
+scripts: {
+  post-install: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/etc/rc.configure_plugins 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true",
+  pre-deinstall: "#!/bin/sh\nrm -f /tmp/opnsense_menu_cache.xml /tmp/opnsense_acl_cache.json /var/lib/php/tmp/opnsense_menu_cache.xml 2>/dev/null || true\n/usr/local/opnsense/service/configd_ctl.py reload actions 2>/dev/null || true"
+}
 EOF
-  cat << EOF > /tmp/plist_os_netbox
-sbin/update-opnbox-rules.sh
-opnsense/service/conf/actions.d/actions_netbox.conf
-opnsense/mvc/app/models/OPNsense/Netbox/Menu/Menu.xml
-EOF
+  (cd "${STAGE_UI_DIR}/usr/local" && find . -type f | sed 's|^\./||' | sort) > /tmp/plist_os_netbox
   pkg create -M /tmp/manifest_os_netbox -p /tmp/plist_os_netbox -r "${STAGE_UI_DIR}" -o "${TARGET_PKG_DIR}"
 fi
 

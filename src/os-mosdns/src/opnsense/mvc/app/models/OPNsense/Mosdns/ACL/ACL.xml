@@ -1,0 +1,10 @@
+<acl>
+    <page-services-mosdns>
+        <name>Services: MosDNS</name>
+        <patterns>
+            <pattern>ui/mosdns/*</pattern>
+            <pattern>ui/mosdns</pattern>
+            <pattern>api/mosdns/*</pattern>
+        </patterns>
+    </page-services-mosdns>
+</acl>
