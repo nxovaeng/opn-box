@@ -23,6 +23,7 @@ import (
 
 var (
 	listenAddr string
+	confDir    string
 	configFile string
 	dataFile   string
 	logFile    string
@@ -90,8 +91,9 @@ type RoutingRule struct {
 
 func main() {
 	flag.StringVar(&listenAddr, "listen", ":5384", "HTTP WebUI listen address")
-	flag.StringVar(&configFile, "config", "/usr/local/etc/xray/config.json", "Path to xray config.json")
-	flag.StringVar(&dataFile, "data", "/usr/local/etc/xray/controller_data.json", "Path to controller state data")
+	flag.StringVar(&confDir, "confdir", "/usr/local/etc/xray-core", "Path to xray confdir (multi-file directory)")
+	flag.StringVar(&configFile, "config", "/usr/local/etc/xray-core/config.json", "Path to legacy/standalone xray config.json")
+	flag.StringVar(&dataFile, "data", "/usr/local/etc/xray-core/controller_data.json", "Path to controller state data")
 	flag.StringVar(&logFile, "log-file", "/var/log/xray.log", "Path to xray log file")
 	flag.StringVar(&rcService, "rc-service", "xray", "FreeBSD rc.d service name")
 	flag.StringVar(&xrayBin, "xray-bin", "/usr/local/bin/xray", "Path to xray binary")
@@ -115,7 +117,7 @@ func main() {
 	http.HandleFunc("/api/config/preview", handlePreviewConfig)
 
 	log.Printf("[xray-controller] Starting Xray Manager on %s", listenAddr)
-	log.Printf("[xray-controller] Target config: %s, data: %s", configFile, dataFile)
+	log.Printf("[xray-controller] Target confdir: %s, data: %s", confDir, dataFile)
 	if err := http.ListenAndServe(listenAddr, nil); err != nil {
 		log.Fatalf("[xray-controller] Failed to start server: %v", err)
 	}
@@ -142,6 +144,15 @@ func getPID() int {
 
 func loadData() (*AppData, error) {
 	data, err := os.ReadFile(dataFile)
+	if err != nil {
+		if sampleBytes, errSample := os.ReadFile(dataFile + ".sample"); errSample == nil {
+			data = sampleBytes
+			err = nil
+		} else if legacyBytes, errLegacy := os.ReadFile("/usr/local/etc/xray/controller_data.json"); errLegacy == nil {
+			data = legacyBytes
+			err = nil
+		}
+	}
 	if err != nil {
 		// Provide default initialized app state
 		return &AppData{
@@ -223,7 +234,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		"running":   pid > 0,
 		"pid":       pid,
 		"timestamp": time.Now().Unix(),
-		"config":    configFile,
+		"confdir":   confDir,
 	})
 }
 
@@ -246,7 +257,7 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Action string `json:"action"` // start, stop, restart, test
+		Action string `json:"action"` // start, stop, restart, test, status
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
@@ -254,7 +265,7 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Action == "test" {
-		cmd := exec.Command(xrayBin, "run", "-test", "-c", configFile)
+		cmd := exec.Command(xrayBin, "run", "-test", "-confdir", confDir)
 		out, err := cmd.CombinedOutput()
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": err == nil,
@@ -263,11 +274,16 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cmd := exec.Command("service", rcService, req.Action)
+	// In FreeBSD, use one* actions
+	actualAction := "one" + req.Action
+	if req.Action == "status" {
+		actualAction = "onestatus"
+	}
+	cmd := exec.Command("service", rcService, actualAction)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		rcPath := fmt.Sprintf("/usr/local/etc/rc.d/%s", rcService)
-		cmd = exec.Command(rcPath, req.Action)
+		cmd = exec.Command(rcPath, actualAction)
 		out, err = cmd.CombinedOutput()
 	}
 
@@ -1100,6 +1116,13 @@ func generateXrayConfig(appData *AppData) (map[string]interface{}, error) {
 		activeOut := copyMap(activeNode.RawOutbound)
 		activeOut["tag"] = "proxy-default"
 		outbounds = append(outbounds, activeOut)
+	} else {
+		// Fallback proxy-default to direct freedom outbound if no node selected
+		outbounds = append(outbounds, map[string]interface{}{
+			"tag":      "proxy-default",
+			"protocol": "freedom",
+			"settings": map[string]interface{}{},
+		})
 	}
 
 	// Other nodes used in routing
@@ -1231,59 +1254,62 @@ func handleApplyConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(appData.Nodes) == 0 {
-		http.Error(w, `{"error":"当前未导入任何节点，无法生成代理配置"}`, http.StatusBadRequest)
-		return
-	}
-
 	cfg, err := generateXrayConfig(appData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// 1. Ensure target confdir exists
+	_ = os.MkdirAll(confDir, 0755)
+
+	// 2. Prepare modular configurations
+	modularFiles := map[string]interface{}{
+		"00_log.json":       map[string]interface{}{"log": cfg["log"]},
+		"02_dns.json":       map[string]interface{}{"dns": cfg["dns"]},
+		"03_routing.json":   map[string]interface{}{"routing": cfg["routing"]},
+		"05_inbounds.json":  map[string]interface{}{"inbounds": cfg["inbounds"]},
+		"06_outbounds.json": map[string]interface{}{"outbounds": cfg["outbounds"]},
 	}
 
-	// 1. Write temporary test config
-	tmpConfig := "/tmp/xray_test.json"
-	if err := os.WriteFile(tmpConfig, cfgJSON, 0644); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"写入临时文件失败: %s"}`, err.Error()), http.StatusInternalServerError)
-		return
+	// 3. Write all 5 modular files into confDir
+	for fname, fcontent := range modularFiles {
+		fpath := fmt.Sprintf("%s/%s", confDir, fname)
+		b, err := json.MarshalIndent(fcontent, "", "  ")
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"格式化 %s 失败: %s"}`, fname, err.Error()), http.StatusInternalServerError)
+			return
+		}
+		if err := os.WriteFile(fpath, b, 0644); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"写入 %s 失败: %s"}`, fname, err.Error()), http.StatusInternalServerError)
+			return
+		}
 	}
-	defer os.Remove(tmpConfig)
 
-	// 2. Syntax check with xray run -test
-	cmd := exec.Command(xrayBin, "run", "-test", "-c", tmpConfig)
+	// 4. Remove any conflicting monolithic config.json in confDir
+	_ = os.Remove(fmt.Sprintf("%s/config.json", confDir))
+
+	// 5. Pre-flight syntax check with xray run -test -confdir
+	cmd := exec.Command(xrayBin, "run", "-test", "-confdir", confDir)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"error":   fmt.Sprintf("Xray 语法预检失败:\n%s", string(out)),
+			"error":   fmt.Sprintf("Xray 语法预检失败 (-confdir %s):\n%s", confDir, string(out)),
 		})
 		return
 	}
 
-	// 3. Write target config
-	_ = os.MkdirAll("/usr/local/etc/xray", 0755)
-	if err := os.WriteFile(configFile, cfgJSON, 0644); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"保存 config.json 失败: %s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
+	// 6. Restart service using onerestart
+	_ = exec.Command("service", rcService, "onerestart").Run()
+	_ = exec.Command(fmt.Sprintf("/usr/local/etc/rc.d/%s", rcService), "onerestart").Run()
 
-	// 4. Restart service
-	_ = exec.Command("service", rcService, "restart").Run()
-	_ = exec.Command(fmt.Sprintf("/usr/local/etc/rc.d/%s", rcService), "restart").Run()
-
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	pid := getPID()
 
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"message": "配置应用成功，Xray 服务已平滑重启",
+		"message": fmt.Sprintf("配置已写入 %s (分模块: 00_log, 02_dns, 03_routing, 05_inbounds, 06_outbounds)，语法检查通过，Xray 服务已成功平滑重启！", confDir),
 		"running": pid > 0,
 		"pid":     pid,
 	})

@@ -1,13 +1,6 @@
 <model>
     <mount>//OPNsense/Tun2socks</mount>
     <version>1.0.0</version>
-    <description>Hev-Socks5-Tunnel Tun2Socks Bridge & Manager</description>
-    <items>
-        <general>
-            <enabled type="BooleanField">
-                <default>1</default>
-                <required>Y</required>
-            </enabled>
-        </general>
-    </items>
+    <description>Hev-Socks5-Tunnel Tun2Socks Bridge &amp; Manager</description>
+    <items/>
 </model>

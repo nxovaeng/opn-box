@@ -187,7 +187,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if req.Restart {
-			_ = exec.Command("service", rcService, "restart").Run()
+			_ = exec.Command("service", rcService, "onerestart").Run()
 		}
 
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -208,7 +208,7 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Action string `json:"action"` // start, stop, restart
+		Action string `json:"action"` // start, stop, restart, status
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
@@ -221,13 +221,14 @@ func handleService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Try service <rcService> <action>, or /usr/local/etc/rc.d/<rcService> <action>
-	cmd := exec.Command("service", rcService, req.Action)
+	// In FreeBSD, use one* actions to avoid enable="NO" block
+	actualAction := "one" + req.Action
+	cmd := exec.Command("service", rcService, actualAction)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// Fallback to explicit path
 		rcPath := fmt.Sprintf("/usr/local/etc/rc.d/%s", rcService)
-		cmd = exec.Command(rcPath, req.Action)
+		cmd = exec.Command(rcPath, actualAction)
 		out, err = cmd.CombinedOutput()
 	}
 
@@ -531,6 +532,7 @@ const htmlIndex = `<!DOCTYPE html>
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem;">
+          <button type="button" class="btn btn-outline" onclick="window.formInitialized = false; fetchStatus();">↺ 重新载入当前配置</button>
           <button type="submit" class="btn btn-primary">💾 保存并立即重启服务</button>
         </div>
       </form>
@@ -582,18 +584,26 @@ const htmlIndex = `<!DOCTYPE html>
           document.getElementById('statSocksPort').textContent = c.socks5?.port || 10808;
           document.getElementById('statSocksUdp').textContent = (c.socks5?.udp === 'udp' ? '原生 UDP' : c.socks5?.udp) || '启用';
 
-          // 填充表单
-          document.getElementById('cfgSocksAddr').value = c.socks5?.address || '127.0.0.1';
-          document.getElementById('cfgSocksPort').value = c.socks5?.port || 10808;
-          document.getElementById('cfgTunName').value = c.tunnel?.name || 'tun0';
-          document.getElementById('cfgTunIpv4').value = c.tunnel?.ipv4 || '198.18.0.1';
-          document.getElementById('cfgTunMtu').value = c.tunnel?.mtu || 1500;
-          document.getElementById('cfgSocksUdp').value = c.socks5?.udp || 'udp';
-          document.getElementById('cfgLogLevel').value = c.misc?.log_level || 'info';
+          // 仅在首次加载时填充表单，避免定时器刷新时将用户正在编辑的内容冲掉
+          if (!window.formInitialized) {
+            populateForm(c);
+            window.formInitialized = true;
+          }
         }
       } catch (e) {
         console.error('Failed to fetch status:', e);
       }
+    }
+
+    function populateForm(c) {
+      if (!c) return;
+      document.getElementById('cfgSocksAddr').value = c.socks5?.address || '127.0.0.1';
+      document.getElementById('cfgSocksPort').value = c.socks5?.port || 10808;
+      document.getElementById('cfgTunName').value = c.tunnel?.name || 'tun0';
+      document.getElementById('cfgTunIpv4').value = c.tunnel?.ipv4 || '198.18.0.1';
+      document.getElementById('cfgTunMtu').value = c.tunnel?.mtu || 1500;
+      document.getElementById('cfgSocksUdp').value = c.socks5?.udp || 'udp';
+      document.getElementById('cfgLogLevel').value = c.misc?.log_level || 'info';
     }
 
     async function controlService(action) {
@@ -642,6 +652,7 @@ const htmlIndex = `<!DOCTYPE html>
         const data = await res.json();
         if (data.success) {
           alert('配置保存成功，并已触发服务重启！');
+          window.formInitialized = false; // 触发重新同步
           setTimeout(fetchStatus, 800);
           setTimeout(refreshLogs, 1200);
         } else {

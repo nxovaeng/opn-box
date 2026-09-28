@@ -1,37 +1,36 @@
 #!/bin/sh
-set -e
-
 # ==============================================================================
 # update_rules.sh - OPN-Box 规则库一键同步与更新脚本 (MosDNS + Xray)
 #
 # 功能说明：
 # 1. 同步 MosDNS 粗粒度分流规则集合至 /usr/local/etc/mosdns/rule/
-#    - cn.txt (国内直连域名大库，来源于 Loyalsoldier direct-list)
-#    - gfw.txt (权威出海代理名单)
-#    - 自动初始化用户自定义白名单/代理名单 (custom-direct.txt / custom-proxy.txt)
-# 2. 同步 Xray 7 层精细分流规则库至 /usr/local/share/xray/
-#    - geosite.dat (Protobuf 7层应用特征库: openai, netflix, google, cn 等)
+#    - cn.txt (国内直连域名大库)
+#    - gfw.txt (出海代理名单)
+#    - 自动补全缺省占位文件，杜绝 MosDNS 启动因文件不存在而 FATAL 崩溃
+# 2. 同步 Xray-core 官方规则资产库至 /usr/local/share/xray-core/
+#    - geosite.dat (Protobuf 7层应用特征库)
 #    - geoip.dat (全球与中国 IP 分段库)
-# 3. 采用原子下载机制 (下载至 .tmp 校验后替换)，避免断网或残损
-# 4. 支持 FreeBSD fetch 与 curl 双下载器，内置 GitHub / CDN 备用镜像通道
-# 5. 更新成功后自动优雅重载/重启运行中的 mosdns 与 xray 服务
+#    - 软链接兼容 /usr/local/share/xray
+# 3. 采用临时文件原子替换，多 CDN 备用镜像轮询重试
+# 4. 更新后平滑重载 mosdns 与 xray 服务 (使用 onerestart)
 # ==============================================================================
 
 RULE_DIR="/usr/local/etc/mosdns/rule"
-XRAY_DIR="/usr/local/share/xray"
+XRAY_DIR="/usr/local/share/xray-core"
 RESTART_SERVICES=1
 MIRROR_ENABLED=0
 
-# 上游主源与备用加速镜像源 (Loyalsoldier v2ray-rules-dat)
+# 多镜像通道
 PRIMARY_BASE="https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download"
-MIRROR_BASE="https://raw.gitmirror.com/Loyalsoldier/v2ray-rules-dat/release"
+MIRROR_CDN="https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release"
+MIRROR_GHPROXY="https://ghfast.top/https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download"
 
 usage() {
     echo "用法: $0 [选项]"
     echo "选项:"
     echo "  --rule-dir <dir>   MosDNS 规则存放目录 (默认: ${RULE_DIR})"
     echo "  --xray-dir <dir>   Xray 规则存放目录 (默认: ${XRAY_DIR})"
-    echo "  --mirror           使用国内加速镜像源同步"
+    echo "  --mirror           优先使用国内加速镜像源同步"
     echo "  --no-restart       更新后不自动重启相关服务"
     echo "  -h, --help         显示帮助信息"
     exit 0
@@ -48,47 +47,48 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-if [ "${MIRROR_ENABLED}" = "1" ]; then
-    BASE_URL="${MIRROR_BASE}"
-else
-    BASE_URL="${PRIMARY_BASE}"
-fi
+fetch_url() {
+    url="$1"
+    output="$2"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --connect-timeout 8 -m 120 -o "${output}" "${url}" >/dev/null 2>&1
+        return $?
+    elif command -v fetch >/dev/null 2>&1; then
+        fetch -q -T 10 -o "${output}" "${url}" >/dev/null 2>&1
+        return $?
+    fi
+    return 1
+}
 
 download_file() {
     file_name="$1"
     dest_path="$2"
-    url="${BASE_URL}/${file_name}"
     tmp_path="${dest_path}.tmp"
 
     printf "  -> 正在获取 %-16s ... " "${file_name}"
 
-    download_ok=0
-    if command -v curl >/dev/null 2>&1; then
-        if curl -fsSL --connect-timeout 10 -m 180 -o "${tmp_path}" "${url}" >/dev/null 2>&1; then
-            download_ok=1
-        fi
-    elif command -v fetch >/dev/null 2>&1; then
-        if fetch -q -T 15 -o "${tmp_path}" "${url}" >/dev/null 2>&1; then
-            download_ok=1
-        fi
-    fi
-
-    # 如果主源失败且尚未尝试备用镜像，尝试备用镜像重试一次
-    if [ ${download_ok} -eq 0 ] && [ "${BASE_URL}" != "${MIRROR_BASE}" ]; then
-        alt_url="${MIRROR_BASE}/${file_name}"
-        if command -v curl >/dev/null 2>&1; then
-            curl -fsSL --connect-timeout 10 -m 180 -o "${tmp_path}" "${alt_url}" >/dev/null 2>&1 && download_ok=1
-        elif command -v fetch >/dev/null 2>&1; then
-            fetch -q -T 15 -o "${tmp_path}" "${alt_url}" >/dev/null 2>&1 && download_ok=1
-        fi
-    fi
-
-    if [ ${download_ok} -eq 1 ] && [ -s "${tmp_path}" ]; then
-        mv -f "${tmp_path}" "${dest_path}"
-        echo "[成功]"
+    if [ "${MIRROR_ENABLED}" = "1" ]; then
+        URLS="${MIRROR_CDN}/${file_name} ${MIRROR_GHPROXY}/${file_name} ${PRIMARY_BASE}/${file_name}"
     else
-        rm -f "${tmp_path}"
-        echo "[失败]"
+        URLS="${PRIMARY_BASE}/${file_name} ${MIRROR_CDN}/${file_name} ${MIRROR_GHPROXY}/${file_name}"
+    fi
+
+    success=0
+    for u in ${URLS}; do
+        if fetch_url "${u}" "${tmp_path}" && [ -s "${tmp_path}" ]; then
+            success=1
+            break
+        fi
+        rm -f "${tmp_path}" 2>/dev/null
+    done
+
+    if [ ${success} -eq 1 ] && [ -s "${tmp_path}" ]; then
+        mv -f "${tmp_path}" "${dest_path}"
+        echo "[成功: $(du -h "${dest_path}" | awk '{print $1}')]"
+        return 0
+    else
+        rm -f "${tmp_path}" 2>/dev/null
+        echo "[跳过/下载失败]"
         return 1
     fi
 }
@@ -97,56 +97,64 @@ echo "=========================================================="
 echo " 开始同步 OPN-Box 规则库 (MosDNS 粗分流 + Xray 7层细分流)"
 echo " MosDNS 目标目录: ${RULE_DIR}"
 echo " Xray 目标目录:   ${XRAY_DIR}"
-echo " 主源基址:        ${BASE_URL}"
 echo "=========================================================="
 
-mkdir -p "${RULE_DIR}" "${XRAY_DIR}"
+mkdir -p "${RULE_DIR}" "${XRAY_DIR}" /usr/local/share/xray 2>/dev/null || true
 
 echo "==> [1/2] 更新 MosDNS 纯文本 Set 集合..."
 download_file "direct-list.txt" "${RULE_DIR}/cn.txt" || true
 download_file "gfw.txt" "${RULE_DIR}/gfw.txt" || true
 
-# 初始化自定义列表模板文件 (若不存在则创建，永久保留用户编辑)
-if [ ! -f "${RULE_DIR}/custom-direct.txt" ]; then
-    cat << 'EOF' > "${RULE_DIR}/custom-direct.txt"
-# 自定义国内/直连白名单域名 (每行一个，支持 domain: / full:)
-# 示例:
-# domain:myprivate.lan
-# domain:internal-company.cn
-EOF
-    echo "  -> 已初始化 ${RULE_DIR}/custom-direct.txt"
-fi
+# 确保核心规则文件非空占位，防止 MosDNS domain_set fatal 退出
+for r in cn.txt gfw.txt; do
+    fpath="${RULE_DIR}/${r}"
+    if [ ! -f "${fpath}" ] || [ ! -s "${fpath}" ]; then
+        echo "# placeholder generated $(date)" > "${fpath}"
+        if [ "${r}" = "cn.txt" ]; then
+            echo "domain:internal.lan" >> "${fpath}"
+        else
+            echo "domain:google.com" >> "${fpath}"
+        fi
+        echo "  -> [保底] 为缺失的 ${r} 创建了非空占位记录"
+    fi
+done
 
-if [ ! -f "${RULE_DIR}/custom-proxy.txt" ]; then
-    cat << 'EOF' > "${RULE_DIR}/custom-proxy.txt"
-# 自定义出海代理黑名单域名 (每行一个，支持 domain: / full:)
-# 示例:
-# domain:myprivatevps.com
-# domain:specific-foreign-site.org
-EOF
-    echo "  -> 已初始化 ${RULE_DIR}/custom-proxy.txt"
-fi
+# 初始化用户自定义列表
+for c in custom-direct.txt custom-proxy.txt; do
+    cpath="${RULE_DIR}/${c}"
+    if [ ! -f "${cpath}" ]; then
+        echo "# 自定义域名分流列表 (${c})" > "${cpath}"
+        echo "  -> 已初始化用户自定义列表: ${c}"
+    fi
+done
 
 echo "==> [2/2] 更新 Xray-core 二进制 Protobuf 特征库..."
 download_file "geosite.dat" "${XRAY_DIR}/geosite.dat" || true
 download_file "geoip.dat" "${XRAY_DIR}/geoip.dat" || true
 
+# 保持 /usr/local/share/xray 与 /usr/local/share/xray-core 同步
+for f in geosite.dat geoip.dat; do
+    if [ -f "${XRAY_DIR}/${f}" ]; then
+        cp -f "${XRAY_DIR}/${f}" "/usr/local/share/xray/${f}" 2>/dev/null || true
+    fi
+done
+
 # 检查服务状态并平滑重载
 if [ "${RESTART_SERVICES}" = "1" ]; then
-    echo "==> [3/3] 检查并重载运行中服务..."
+    echo "==> [3/3] 检查并平滑重载运行中服务..."
     if pgrep -x "mosdns" >/dev/null 2>&1; then
-        echo "  -> 正在平滑重启 mosdns 服务..."
-        service mosdns restart >/dev/null 2>&1 || /usr/local/etc/rc.d/mosdns restart >/dev/null 2>&1 || true
+        echo "  -> 重启 mosdns 服务..."
+        service mosdns onerestart >/dev/null 2>&1 || /usr/local/etc/rc.d/mosdns onerestart >/dev/null 2>&1 || true
     fi
     if pgrep -x "xray" >/dev/null 2>&1; then
-        echo "  -> 正在平滑重启 xray 服务..."
-        service xray restart >/dev/null 2>&1 || /usr/local/etc/rc.d/xray restart >/dev/null 2>&1 || true
+        echo "  -> 重启 xray 服务..."
+        service xray onerestart >/dev/null 2>&1 || /usr/local/etc/rc.d/xray onerestart >/dev/null 2>&1 || true
     fi
 fi
 
 echo "=========================================================="
 echo " 规则库同步完成！"
-echo " MosDNS 规则: $(ls -1 ${RULE_DIR}/*.txt 2>/dev/null | tr '\n' ' ')"
-echo " Xray 规则:   $(ls -1 ${XRAY_DIR}/*.dat 2>/dev/null | tr '\n' ' ')"
+echo " MosDNS 规则列表: $(ls -1 ${RULE_DIR}/*.txt 2>/dev/null | xargs -n1 basename | tr '\n' ' ')"
+echo " Xray 规则列表:   $(ls -1 ${XRAY_DIR}/*.dat 2>/dev/null | xargs -n1 basename | tr '\n' ' ')"
 echo "=========================================================="
-
+exit 0

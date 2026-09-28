@@ -1,13 +1,6 @@
 <model>
     <mount>//OPNsense/Mosdns</mount>
     <version>1.0.0</version>
-    <description>MosDNS Dynamic Routing Engine & Controller</description>
-    <items>
-        <general>
-            <enabled type="BooleanField">
-                <default>1</default>
-                <required>Y</required>
-            </enabled>
-        </general>
-    </items>
+    <description>MosDNS Dynamic Routing Engine &amp; Controller</description>
+    <items/>
 </model>

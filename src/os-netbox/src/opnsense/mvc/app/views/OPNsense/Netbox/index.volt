@@ -174,14 +174,31 @@ $(document).ready(function() {
 
     function runServiceAction(actionName, btn) {
         btn.prop('disabled', true);
-        $('#action-alert').removeClass('alert-danger alert-info').addClass('alert-warning').text('正在执行: ' + actionName + '，请稍候...').show();
-        $.post('/api/netbox/service/' + actionName, {}, function(res) {
-            btn.prop('disabled', false);
-            $('#action-alert').removeClass('alert-warning').addClass('alert-success').text('操作执行完毕！').delay(3000).fadeOut();
-            refreshStatus();
-        }).fail(function() {
-            btn.prop('disabled', false);
-            $('#action-alert').removeClass('alert-warning').addClass('alert-danger').text('操作执行失败，请检查系统日志。');
+        var oldHtml = btn.html();
+        btn.html('<i class="fa fa-spinner fa-spin fa-fw"></i> 执行中...');
+        $('#action-alert').removeClass('alert-danger alert-info alert-success').addClass('alert-warning').html('<i class="fa fa-spinner fa-spin fa-fw"></i> 正在执行动作 [' + actionName + ']，请稍候...').show();
+        $('#status-terminal').text('==> 正在向 OPNsense 后台调度引擎下发指令 [' + actionName + ']，请稍候...\n');
+
+        $.ajax({
+            url: '/api/netbox/service/' + actionName,
+            type: 'POST',
+            dataType: 'json',
+            timeout: 180000
+        }).done(function(res) {
+            btn.prop('disabled', false).html(oldHtml);
+            if (res && res.output) {
+                $('#status-terminal').text(res.output);
+            }
+            if (res && res.status === 'ok') {
+                $('#action-alert').removeClass('alert-warning alert-danger').addClass('alert-success').html('<i class="fa fa-check fa-fw"></i> 指令执行完毕！').delay(4000).fadeOut();
+            } else {
+                $('#action-alert').removeClass('alert-warning alert-success').addClass('alert-danger').html('<i class="fa fa-exclamation-triangle fa-fw"></i> 指令执行返回异常或被系统拦截，请查看下方诊断终端！');
+            }
+            setTimeout(refreshStatus, 800);
+        }).fail(function(xhr, status, error) {
+            btn.prop('disabled', false).html(oldHtml);
+            $('#action-alert').removeClass('alert-warning alert-success').addClass('alert-danger').html('<i class="fa fa-times fa-fw"></i> 请求失败 (' + status + '): ' + error);
+            $('#status-terminal').text('HTTP 通信错误: ' + status + '\n' + (xhr.responseText || error));
         });
     }
 

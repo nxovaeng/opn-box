@@ -203,7 +203,6 @@ mkdir -p "${WORKSPACE_DIR}/dist/rc.d" "${WORKSPACE_DIR}/dist/etc" "${WORKSPACE_D
 [ -f "${WORKSPACE_DIR}/rc.d/mosdns_controller" ] && cp "${WORKSPACE_DIR}/rc.d/mosdns_controller" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" ] && cp "${WORKSPACE_DIR}/rc.d/hev_socks5_tunnel" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/hev_controller" ] && cp "${WORKSPACE_DIR}/rc.d/hev_controller" "${WORKSPACE_DIR}/dist/rc.d/"
-[ -f "${WORKSPACE_DIR}/rc.d/xray" ] && cp "${WORKSPACE_DIR}/rc.d/xray" "${WORKSPACE_DIR}/dist/rc.d/"
 [ -f "${WORKSPACE_DIR}/rc.d/xray_controller" ] && cp "${WORKSPACE_DIR}/rc.d/xray_controller" "${WORKSPACE_DIR}/dist/rc.d/"
 if [ -f "${WORKSPACE_DIR}/config.mosdns.example.yaml" ]; then
     cp "${WORKSPACE_DIR}/config.mosdns.example.yaml" "${WORKSPACE_DIR}/dist/etc/mosdns.yaml.example"
