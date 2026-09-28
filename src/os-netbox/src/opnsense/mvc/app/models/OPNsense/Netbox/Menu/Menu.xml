@@ -1,7 +1,10 @@
 <menu>
     <Services>
         <NetBox VisibleName="NetBox" cssClass="fa fa-cubes fa-fw">
-            <Dashboard VisibleName="Dashboard" url="/ui/netbox" Order="1"/>
+            <Dashboard VisibleName="仪表盘 (Dashboard)" url="/ui/netbox" Order="1"/>
+            <MosDNS VisibleName="MosDNS 智能分流" url="/ui/mosdns" Order="10"/>
+            <Tun2Socks VisibleName="Tun2Socks 虚拟网卡" url="/ui/tun2socks" Order="20"/>
+            <Xray VisibleName="Xray 代理核心" url="/ui/xray" Order="30"/>
         </NetBox>
     </Services>
 </menu>

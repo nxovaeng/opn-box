@@ -5,6 +5,12 @@
             <pattern>ui/netbox/*</pattern>
             <pattern>ui/netbox</pattern>
             <pattern>api/netbox/*</pattern>
+            <pattern>ui/mosdns/*</pattern>
+            <pattern>ui/mosdns</pattern>
+            <pattern>ui/tun2socks/*</pattern>
+            <pattern>ui/tun2socks</pattern>
+            <pattern>ui/xray/*</pattern>
+            <pattern>ui/xray</pattern>
         </patterns>
     </page-services-netbox>
 </acl>

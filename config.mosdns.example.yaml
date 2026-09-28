@@ -1,10 +1,11 @@
 # ==============================================================================
 # MosDNS v5 Configuration - OPN-Box 粗粒度智能分流与零竞态 PF 同步
+# 适配官方版本: MosDNS v5.3.4 (现代流水线语法，完全杜绝 v4 解码崩溃)
 #
 # 分流逻辑：
 # 1. 明确国内域名与白名单 (cn.txt / custom-direct.txt) -> 国内 DNS 直连解析并返回 (不入代理表)
 # 2. 明确出海域名 (gfw.txt / custom-proxy.txt) 以及 未明确分类的境外/未知域名 ->
-#    全部走海外防污染 DoH (1.1.1.1 / 8.8.8.8) 并注入 PF Table <GFW_Proxy> 送往 TUN
+#    全部走海外防污染 DoH (经 Xray 127.0.0.1:10853) 并注入 PF Table <GFW_Proxy> 送往 TUN 网卡
 # 3. 后端 Xray-core 利用 7 层 SNI 嗅探与 geosite.dat 进行二次精细分流 (OpenAI/流媒体等)
 # ==============================================================================
 
@@ -26,31 +27,18 @@ plugins:
         # 直接接入 Xray 的 dns-in 入站 (dokodemo-door: 127.0.0.1:10853)。
         # 运行原理:
         # 1. 走本地回环通信 (lo0)，完全不经过 TUN 虚拟网卡，天然杜绝死锁与漏流；
-        # 2. Xray 收到后，由路由规则 inboundTag: ["dns-in"] 导向 dns-out，
-        #    并使用 Xray 内部 "dns" 模块配置的境外上游通过当前激活的代理节点出海解析；
-        # 3. 注意: 此处为直连本机回环端口，绝对不能在此配置 socks5 代理！
+        # 2. Xray 收到后，由路由规则导向出站，并使用当前激活的代理节点出海解析；
+        # 3. 注意: 此处为直连本机回环端口，无需也不应在此配置 socks5 代理。
         # ----------------------------------------------------------------------
         - addr: "127.0.0.1:10853"
-
-        # ----------------------------------------------------------------------
-        # 方案二 (经本地 SOCKS5 代理走远端公共 DNS，备选):
-        # MosDNS 自身直接通过 Xray 的 SOCKS5 入站 (127.0.0.1:10808) 发起 TCP 远端查询。
-        # 此时 MosDNS 是 SOCKS5 客户端，由 Xray 远程代理解析远端 1.1.1.1。
-        # ----------------------------------------------------------------------
-        # - addr: "tcp://1.1.1.1:53"
-        #   socks5: "127.0.0.1:10808"
-        # - addr: "tcp://8.8.8.8:53"
-        #   socks5: "127.0.0.1:10808"
-        # - addr: "https://1.1.1.1/dns-query"
-        #   socks5: "127.0.0.1:10808"
-        #   enable_pipeline: true
 
   - tag: forward_local
     type: forward
     args:
+      concurrent: 2
       upstreams:
-        - addr: "223.5.5.5"
-        - addr: "119.29.29.29"
+        - addr: "223.5.5.5:53"
+        - addr: "119.29.29.29:53"
 
   # -------------------------------------------------------------
   # 2. Domain Data Providers (域名 Set 规则集合)
@@ -85,37 +73,35 @@ plugins:
       sync: true                  # 同步阻塞注入 (消除首包失步竞态)
 
   # -------------------------------------------------------------
-  # 4. Main Sequence Pipeline (主匹配流水线)
+  # 4. Main Sequence Pipeline (主匹配流水线 - MosDNS v5 标准语法)
   # -------------------------------------------------------------
   - tag: main_sequence
     type: sequence
     args:
-      exec:
-        # [步骤 1] 明确不走代理的国内域名：走国内 DNS 解析，直接返回 (不进 PF 代理表)
-        - if:
-            - query_is_direct_domain
-          exec:
-            - forward_local
-            - _return
+      # [步骤 1] 明确不走代理的国内域名：走国内 DNS 解析，若已获取解析结果则直接返回 (不进 PF 代理表)
+      - matches:
+          - qname $direct_domain_set
+        exec: $forward_local
+      - matches:
+          - has_resp
+        exec: return
 
-        # [步骤 2] 明确走代理 (gfw/custom-proxy) 以及 未明确归类的境外/未知域名：
-        #         统一走海外防污染 DoH 解析，并同步将 IP 注入 PF Table <GFW_Proxy> 进入 TUN 网卡
-        - forward_remote
-        - sync_to_pf
-        - _return
-
-  # 匹配国内直连集合子序列
-  - tag: query_is_direct_domain
-    type: sequence
-    args:
-      exec:
-        - _matches_domain: direct_domain_set
+      # [步骤 2] 未匹配直连的境外或未知域名：
+      #         统一走海外防污染 DoH 解析，并同步将 IP 注入 PF Table <GFW_Proxy> 进入 TUN 网卡
+      - exec: $forward_remote
+      - exec: $sync_to_pf
 
   # -------------------------------------------------------------
   # 5. DNS Server Listeners (本地监听)
   # -------------------------------------------------------------
   - tag: udp_server
     type: udp_server
+    args:
+      entry: main_sequence
+      listen: "127.0.0.1:5353"
+
+  - tag: tcp_server
+    type: tcp_server
     args:
       entry: main_sequence
       listen: "127.0.0.1:5353"

@@ -49,9 +49,9 @@ type MosdnsLog struct {
 }
 
 type MosdnsPlugin struct {
-	Tag  string                 `yaml:"tag"`
-	Type string                 `yaml:"type"`
-	Args map[string]interface{} `yaml:"args"`
+	Tag  string      `yaml:"tag"`
+	Type string      `yaml:"type"`
+	Args interface{} `yaml:"args"`
 }
 
 var (
@@ -363,51 +363,18 @@ func generateMosdnsConfig(s *ControllerSettings) error {
 		},
 	})
 
-	// Match helper sequences
-	if len(directFiles) > 0 {
-		cfg.Plugins = append(cfg.Plugins, MosdnsPlugin{
-			Tag:  "query_is_direct_domain",
-			Type: "sequence",
-			Args: map[string]interface{}{
-				"exec": []interface{}{
-					map[string]interface{}{"_matches_domain": "direct_domain_set"},
-				},
-			},
-		})
-	}
-	if len(proxyFiles) > 0 {
-		cfg.Plugins = append(cfg.Plugins, MosdnsPlugin{
-			Tag:  "query_is_proxy_domain",
-			Type: "sequence",
-			Args: map[string]interface{}{
-				"exec": []interface{}{
-					map[string]interface{}{"_matches_domain": "proxy_domain_set"},
-				},
-			},
-		})
-	}
-	if hasBlockSet {
-		cfg.Plugins = append(cfg.Plugins, MosdnsPlugin{
-			Tag:  "query_is_block_domain",
-			Type: "sequence",
-			Args: map[string]interface{}{
-				"exec": []interface{}{
-					map[string]interface{}{"_matches_domain": "block_domain_set"},
-				},
-			},
-		})
-	}
-
-	// 5. Main Sequence Pipeline
-	mainExec := make([]interface{}, 0)
+	// 5. Main Sequence Pipeline (MosDNS v5 sequence rule syntax)
+	mainRules := make([]map[string]interface{}, 0)
 
 	// Step 0: Custom Block check
 	if hasBlockSet {
-		mainExec = append(mainExec, map[string]interface{}{
-			"if": []interface{}{"query_is_block_domain"},
-			"exec": []interface{}{
-				"_drop",
-			},
+		mainRules = append(mainRules, map[string]interface{}{
+			"matches": []string{"qname $block_domain_set"},
+			"exec":    "reject 3",
+		})
+		mainRules = append(mainRules, map[string]interface{}{
+			"matches": []string{"has_resp"},
+			"exec":    "return",
 		})
 	}
 
@@ -418,43 +385,61 @@ func generateMosdnsConfig(s *ControllerSettings) error {
 	switch s.Mode {
 	case "blacklist":
 		if len(proxyFiles) > 0 {
-			mainExec = append(mainExec, map[string]interface{}{
-				"if": []interface{}{"query_is_proxy_domain"},
-				"exec": []interface{}{
-					"forward_remote",
-					"sync_to_pf",
-					"_return",
-				},
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"qname $proxy_domain_set"},
+				"exec":    "$forward_remote",
+			})
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"qname $proxy_domain_set"},
+				"exec":    "$sync_to_pf",
+			})
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"has_resp"},
+				"exec":    "return",
 			})
 		}
 		// Unmatched: direct
-		mainExec = append(mainExec, "forward_local", "_return")
+		mainRules = append(mainRules, map[string]interface{}{
+			"exec": "$forward_local",
+		})
 
 	case "custom":
 		if len(directFiles) > 0 {
-			mainExec = append(mainExec, map[string]interface{}{
-				"if": []interface{}{"query_is_direct_domain"},
-				"exec": []interface{}{
-					"forward_local",
-					"_return",
-				},
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"qname $direct_domain_set"},
+				"exec":    "$forward_local",
+			})
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"has_resp"},
+				"exec":    "return",
 			})
 		}
 		if len(proxyFiles) > 0 {
-			mainExec = append(mainExec, map[string]interface{}{
-				"if": []interface{}{"query_is_proxy_domain"},
-				"exec": []interface{}{
-					"forward_remote",
-					"sync_to_pf",
-					"_return",
-				},
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"qname $proxy_domain_set"},
+				"exec":    "$forward_remote",
+			})
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"qname $proxy_domain_set"},
+				"exec":    "$sync_to_pf",
+			})
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"has_resp"},
+				"exec":    "return",
 			})
 		}
 		// Unmatched: check CustomDefaultRoute
 		if s.CustomDefaultRoute == "proxy" {
-			mainExec = append(mainExec, "forward_remote", "sync_to_pf", "_return")
+			mainRules = append(mainRules, map[string]interface{}{
+				"exec": "$forward_remote",
+			})
+			mainRules = append(mainRules, map[string]interface{}{
+				"exec": "$sync_to_pf",
+			})
 		} else {
-			mainExec = append(mainExec, "forward_local", "_return")
+			mainRules = append(mainRules, map[string]interface{}{
+				"exec": "$forward_local",
+			})
 		}
 
 	case "whitelist":
@@ -462,24 +447,28 @@ func generateMosdnsConfig(s *ControllerSettings) error {
 	default:
 		// Default: Whitelist mode
 		if len(directFiles) > 0 {
-			mainExec = append(mainExec, map[string]interface{}{
-				"if": []interface{}{"query_is_direct_domain"},
-				"exec": []interface{}{
-					"forward_local",
-					"_return",
-				},
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"qname $direct_domain_set"},
+				"exec":    "$forward_local",
+			})
+			mainRules = append(mainRules, map[string]interface{}{
+				"matches": []string{"has_resp"},
+				"exec":    "return",
 			})
 		}
 		// Unmatched: remote + sync_to_pf
-		mainExec = append(mainExec, "forward_remote", "sync_to_pf", "_return")
+		mainRules = append(mainRules, map[string]interface{}{
+			"exec": "$forward_remote",
+		})
+		mainRules = append(mainRules, map[string]interface{}{
+			"exec": "$sync_to_pf",
+		})
 	}
 
 	cfg.Plugins = append(cfg.Plugins, MosdnsPlugin{
 		Tag:  "main_sequence",
 		Type: "sequence",
-		Args: map[string]interface{}{
-			"exec": mainExec,
-		},
+		Args: mainRules,
 	})
 
 	// 6. Listeners (UDP and TCP)

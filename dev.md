@@ -78,7 +78,21 @@ OPNsense 官方源内置了 `security/xray-core`（如 `xray-core-26.7.28_1`）�
   1. `update_rules.sh` 将 CDN 加速通道置为默认 (`MIRROR_ENABLED=1`)，支持 `--no-mirror`，调优连接超时。
   2. `actions_netbox.conf` 与 `actions_mosdns.conf` 中的所有规则更新指令均显式声明 `--mirror`。
   3. `index.volt` 重构 `refreshStatus(updateTerminal)`，在动作完成后传入 `false` 仅静默同步徽标状态，坚决保留控制台内原样输出；增加中文友好提示并将 Ajax 超时扩大至 300 秒。
-  4. 优化 `package_repo.sh` post-install 顺序，先重启 configd 再执行 `rc.configure_plugins`。
+### 7. MosDNS v5.3.4 sequence 解码崩溃 `* '[0].exec' expected type 'string', got unconvertible type '[]interface {}'`
+- **根因**：历史示例配置与 `cmd/mosdns-controller/main.go` 沿用了 MosDNS v4 时代的语法（`args: exec: - if: ... exec: [...]`）。在 MosDNS v5.3.4 中，`sequence` 插件的数据结构被重构为扁平线性流水线（`type Args = []RuleArgs`，字段仅为 `matches: []string` 和 `exec: string`）。v5 中已彻底移除 `if: ...`、`_matches_domain`、`_return` 等 v4 插件，而是改用 `qname $direct_domain_set` 结合 `has_resp` 与 `return`。
+- **修复**：全面对齐 MosDNS v5.3.4 规范：
+  1. 将 `config.mosdns.example.yaml` 与 `cmd/mosdns-controller/main.go` 统一重构为标准 v5 sequence 语法；
+  2. 将 `MosdnsPlugin.Args` 类型升级为 `interface{}` 以原生支持 slice 序列化；
+  3. 增加全模式单测 `TestMosDNSv5AllModes` 100% 验证通过；
+  4. 重新基于官方 `v5.3.4` 源码编译了内嵌 `pf_alias` 的全新 FreeBSD `dist/bin/mosdns`。
+
+### 8. OPNsense 插件页面显示「配置错误」(misconfigured) 与 NetBox 下只有仪表盘菜单
+- **根因**：
+  1. OPNsense 插件列表中的「配置错误」（misconfigured）是由于该插件是通过命令行 `pkg install` 或自定义离线源安装的，系统在 `/conf/config.xml` 的备份/恢复跟踪列表中未找到对应记录。这属于 OPNsense 固件管理器的外观跟踪提示（Cosmetic tracking state），不影响插件的功能与系统服务的正常运行；
+  2. `os-netbox` 原先的 `Menu.xml` 仅包含 `<Dashboard>` 节点，其余 3 个组件的菜单分散在各自子插件的 Menu.xml 中。若子插件未被缓存识别，左侧边栏则仅显示仪表盘。
+- **修复**：
+  1. 在 `src/os-netbox/src/opnsense/mvc/app/models/OPNsense/Netbox/Menu/Menu.xml` 与 `ACL.xml` 中直接汇总声明完整 4 项导航菜单（仪表盘、MosDNS 智能分流、Tun2Socks 虚拟网卡、Xray 代理核心）；
+  2. 消除「配置错误」提示只需在 OPNsense 后台 **System > Firmware > Status** 中运行审计并点击 **“Reset all local conflicts”** 接受当前安装状态。
 
 ---
 
